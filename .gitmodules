@@ -1,0 +1,4 @@
+[submodule "hudb/huddle"]
+	path = hudb/huddle
+    url = https://github.com/brabect1/huddle
+    branch = local_namespace
