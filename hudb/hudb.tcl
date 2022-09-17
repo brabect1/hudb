@@ -18,6 +18,12 @@ namespace eval hudb {
     set db {HUDDLE {D {}}};
     set separator {/}
 
+    proc reset {} {
+        namespace upvar [namespace current] db db;
+        set db {HUDDLE {D {}}};
+    }
+
+
     proc is_wellformed {} {
         namespace upvar [namespace current] db db;
         if {![huddle isHuddle ${db}]} {
@@ -54,29 +60,39 @@ namespace eval hudb {
 
         if {[llength $args] < 2} { error "Wrong number of arguments"; }
         set tag s;
+        array set _opts { type {} json 0 }
         set i 0;
-        switch -glob -- [lindex $args $i] {
-            -type {
-                if {[llength $args] < 4} { error "Wrong number of arguments"; }
-                incr i 1;
-                set type [lindex $args $i];
-                if {![info exists huddle::types(tagOfType:${type})]} {
-                    error "Unknown type '${type}'!";
-                } else {
-                    set tag $huddle::types(tagOfType:${type});
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -type {
+                    if {[llength $args] < 4} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set type [lindex $args $i];
+                    if {${type} eq "--"} {
+                        error "Missing type for the -type option!";
+                    } elseif {![info exists huddle::types(tagOfType:${type})]} {
+                        error "Unknown type '${type}'!";
+                    } else {
+                        set tag $huddle::types(tagOfType:${type});
+                    }
+                    if {![info exists huddle::types(isContainer:${tag})]} {
+                        error "Cannot support '${type}'!";
+                    } elseif {$huddle::types(isContainer:${tag}) ne "no"} {
+                        #TODO Not sure if this will end up `-json` or `-type json`.
+                        error "Container types not supported. Use -json option."
+                    }
+                    set _opts(type) ${type};
                 }
-                incr i 1;
-                if {![info exists huddle::types(isContainer:${tag})]} {
-                    error "Cannot support '${type}'!";
-                } elseif {$huddle::types(isContainer:${tag}) ne "no"} {
-                    error "Container types not supported. Use -json option."
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option '[lindex $args $i]'!";
+                }
+                default {
+                    break;
                 }
             }
-            -- { incr i 1; }
-            -* {
-                error "Unknown option [lindex $args $i]";
-            }
-        }
+            incr i 1;
+        }; # while
 
         if {$i+2 != [llength $args]} {
             error "Too many arguments! Args: ${args}";
@@ -203,16 +219,21 @@ namespace eval hudb {
 
         array set _opts { quiet 0 }
         set i 0;
-        switch -glob -- [lindex $args $i] {
-            -quiet {
-                set _opts(quiet) 1;
-                incr i 1;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -quiet {
+                    set _opts(quiet) 1;
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
             }
-            -- { incr i 1; }
-            -* {
-                error "Unknown option [lindex $args $i]";
-            }
-        }
+            incr i 1;
+        }; #while
 
         set args [lrange $args $i end];
         foreach key $args {
@@ -230,16 +251,29 @@ namespace eval hudb {
             error "Malformed DB!";
         }
 
-        array set _opts { list 0 }
+        array set _opts {quiet 0 list 0 }
         set i 0;
-        switch -glob -- [lindex $args $i] {
-            -list {
-                set _opts(list) 1;
-                incr i 1;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -list {
+                    set _opts(list) 1;
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
             }
-            -- { incr i 1; }
-            -* {
-                error "Unknown option [lindex $args $i]";
+            incr i 1;
+        }; #while
+
+        if {$i >= [llength $args]} {
+            if {[info exists _opts(quiet)] && ${_opts(quiet)}} {
+                return 0;
+            } else {
+                error "Too few arguments: '${args}'";
             }
         }
 
@@ -321,30 +355,30 @@ namespace eval hudb {
     }
 }
 
-##puts "isHuddle=[huddle isHuddle $::hudb::db]"
-puts "empty=[hudb::is_empty]"
-puts "db=$::hudb::db"
-#@ parray ::huddle::types
-hudb::set_key -type number x/y 1.0
-hudb::set_key a xyz
-set l {x y}
-##puts [eval huddle get_stripped \$::hudb::db [subst $l]]
-puts [::hudb::get_key x/y]
-puts [::hudb::get_key -raw x/y]
-puts [::hudb::get_key -type x/y]
-hudb::set_key -type string x/y 1.5
-puts "db=$::hudb::db"
-puts "exists=[::hudb::exists_key x/y a x]"
-puts "exists=[::hudb::exists_key -list x/y a x]"
-puts "exists=[::hudb::exists_key x/y b x]"
-puts "exists=[::hudb::exists_key -list x/y b x y]"
-puts "is_empty=[::hudb::is_empty_key x]"
-puts "is_empty=[::hudb::is_empty_key a]"
-hudb::set_key a ""
-puts "is_empty=[::hudb::is_empty_key a]"
-::hudb::delete_key x/y a
-puts "db=$::hudb::db"
-puts "is_empty=[::hudb::is_empty_key x]"
-hudb::set_key -type boolean x tadaaa
-puts "db=$::hudb::db"
+## ##puts "isHuddle=[huddle isHuddle $::hudb::db]"
+## puts "empty=[hudb::is_empty]"
+## puts "db=$::hudb::db"
+## #@ parray ::huddle::types
+## hudb::set_key -type number x/y 1.0
+## hudb::set_key a xyz
+## set l {x y}
+## ##puts [eval huddle get_stripped \$::hudb::db [subst $l]]
+## puts [::hudb::get_key x/y]
+## puts [::hudb::get_key -raw x/y]
+## puts [::hudb::get_key -type x/y]
+## hudb::set_key -type string x/y 1.5
+## puts "db=$::hudb::db"
+## puts "exists=[::hudb::exists_key x/y a x]"
+## puts "exists=[::hudb::exists_key -list x/y a x]"
+## puts "exists=[::hudb::exists_key x/y b x]"
+## puts "exists=[::hudb::exists_key -list x/y b x y]"
+## puts "is_empty=[::hudb::is_empty_key x]"
+## puts "is_empty=[::hudb::is_empty_key a]"
+## hudb::set_key a ""
+## puts "is_empty=[::hudb::is_empty_key a]"
+## ::hudb::delete_key x/y a
+## puts "db=$::hudb::db"
+## puts "is_empty=[::hudb::is_empty_key x]"
+## hudb::set_key -type boolean x tadaaa
+## puts "db=$::hudb::db"
 
