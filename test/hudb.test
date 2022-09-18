@@ -765,6 +765,46 @@ test hudb-is_wellformed.2 "test of a non-empty DB" -setup {
 
 
 #------------------------------------------------
+# custom type: uri
+#------------------------------------------------
+test hudb-uri.1.1 "test of URI `set_key -type uri`" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -type uri a /my/absolute/path;
+} -result {HUDDLE {D {a {uri /my/absolute/path}}}}
+
+
+test hudb-uri.2.1 "test of URI `get_key`" -setup {
+    set ::hudb::db {HUDDLE {D {a {uri /my/absolute/path}}}} 
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::get_key a;
+} -result {/my/absolute/path}
+
+
+test hudb-uri.2.2 "test of URI `get_key -type`" -setup {
+    set ::hudb::db {HUDDLE {D {a {uri /my/absolute/path}}}} 
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::get_key -type a;
+} -result {uri}
+
+
+test hudb-uri.2.3 "test of URI `get_key -raw`" -setup {
+    set ::hudb::db {HUDDLE {D {a {uri /my/absolute/path}}}} 
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::get_key -raw a;
+} -result {HUDDLE {uri /my/absolute/path}}
+
+
+#------------------------------------------------
 # end of unit tests
 #------------------------------------------------
 

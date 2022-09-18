@@ -18,6 +18,52 @@ namespace eval hudb {
     set db {HUDDLE {D {}}};
     set separator {/}
 
+
+    # infuse new Huddle types into the `huddle` namespace
+    namespace eval huddle {
+        namespace eval uri {
+            variable settings;
+
+            set settings {
+                publicMethods {uri}
+                tag uri
+                isContainer no
+            };
+
+            proc uri {src} {
+                return [::huddle::wrap [list uri $src]];
+            }
+
+            proc equal {p1 p2} {
+                #TODO shall compare canonical forms (to cope with relative
+                #     path aspects
+                return [expr {$p1 eq $p2}];
+            }
+
+            proc jsondump {data {offset "  "} {newline "\n"} {begin ""}} {
+                # JSON permits only oneline string
+                set data [string map {
+                        \n \\n
+                        \t \\t
+                        \r \\r
+                        \b \\b
+                        \f \\f
+                        \\ \\\\
+                        \" \\\"
+                        / \\/
+                    } $data
+                ];
+                return "\"$data\""
+            }
+
+        }; # end of huddle::uri namespace
+    }
+
+
+    # register new huddle types
+    huddle addType "[namespace current]::huddle::uri";
+
+
     proc reset {} {
         namespace upvar [namespace current] db db;
         set db {HUDDLE {D {}}};
