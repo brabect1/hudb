@@ -3,6 +3,6 @@
     url = https://github.com/brabect1/huddle
     branch = local_namespace
 [submodule "uri"]
-	path = uri
+	path = hudb/uri
 	url = https://github.com/brabect1/uri
 	branch = local_namespace
