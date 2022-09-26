@@ -59,6 +59,42 @@ namespace eval hudb {
         }; # end of huddle::uri namespace
     }
 
+    # file path related API
+    namespace eval filepath {
+
+        # Returns the given path as relative to the base_dir
+        #
+        # If any of the arguments is a relative path, it will be
+        # interpretted as relative to the current working path as
+        # given by `pwd`.
+        proc rebase {base_dir path} {
+            set base_dir [file normalize $base_dir];
+            set path [file normalize $path];
+            set separator [file separator];
+
+            set base_parts [file split $base_dir]
+            set path_parts [file split $path]
+            set i 0;
+            foreach bpart $base_parts ppart $path_parts {
+                if {$bpart ne $ppart} break
+                incr i 1;
+            }
+            set back_steps [expr [llength $base_parts] - $i];
+            set l [lrange $path_parts $i end];
+            if {$back_steps > 0} {
+                set parts [file split [string repeat "..[file separator]" $back_steps]];
+                eval lappend parts $l;
+                set x [eval file join $parts];
+            } elseif {$i < [llength $path_parts]} {
+                set x [eval file join $l];
+            } else {
+                set x ".";
+            }
+            return $x
+        }
+
+    }
+
 
     # register new huddle types
     huddle addType "[namespace current]::huddle::uri";

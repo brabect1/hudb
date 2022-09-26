@@ -814,6 +814,34 @@ test hudb-uri.2.3 "test of URI `get_key -raw`" -setup {
 
 
 #------------------------------------------------
+# filepath: rebase
+#------------------------------------------------
+test hudb-filepath_rebase.1.1.1 "test of path rebase (abs paths)" -body {
+    ::hudb::filepath::rebase /a/b /e/f/g
+} -result {../../e/f/g}
+
+test hudb-filepath_rebase.1.1.2 "test of path rebase (abs paths)" -body {
+    ::hudb::filepath::rebase /a/b/ /e/f/g
+} -result {../../e/f/g}
+
+test hudb-filepath_rebase.1.2.1 "test of path rebase (abs paths, same dir)" -body {
+    ::hudb::filepath::rebase /e/f /e/f/g
+} -result {g}
+
+test hudb-filepath_rebase.1.2.2 "test of path rebase (abs paths, same dir)" -body {
+    ::hudb::filepath::rebase /e/f/ /e/f/g
+} -result {g}
+
+test hudb-filepath_rebase.1.3 "test of path rebase (abs paths, same path)" -body {
+    ::hudb::filepath::rebase /e/f/g /e/f/g
+} -result {.}
+
+test hudb-filepath_rebase.1.4 "test of path rebase (abs path to root base)" -body {
+    ::hudb::filepath::rebase / /e/f/g
+} -result {e/f/g}
+
+
+#------------------------------------------------
 # end of unit tests
 #------------------------------------------------
 
