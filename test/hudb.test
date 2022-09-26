@@ -22,6 +22,15 @@ namespace import ::control::assert
 
 source [file join [file dirname [info script]] .. hudb hudb.tcl];
 
+#TODO tests to skip as their behavior has not been decided
+skip {
+    hudb-exists_key.3.3
+    hudb-set_key.13.1
+    hudb-set_key.13.2
+    hudb-set_key.13.3
+    hudb-set_key.13.4
+}
+
 
 #------------------------------------------------
 # hudb::reset
