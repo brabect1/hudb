@@ -840,6 +840,69 @@ test hudb-filepath_rebase.1.4 "test of path rebase (abs path to root base)" -bod
     ::hudb::filepath::rebase / /e/f/g
 } -result {e/f/g}
 
+#TODO test other combinations of relative and absolute paths
+
+
+#------------------------------------------------
+# to_file
+#------------------------------------------------
+
+# writing to stdout
+test hudb-to_file.2.1 "test writing file in huddle format (stdout)" -setup {
+    set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::to_file -huddle
+} -cleanup {
+    ::hudb::reset
+} -result {} -output {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}}
+
+# writing to a file
+test hudb-to_file.2.2 "test writing file in huddle format (file)" -setup {
+    set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+    set path [file join [file dirname [info script]] hudb-to_file.2.2];
+} -body {
+    ::hudb::to_file -huddle ${path};
+    puts -nonewline stdout [read [open ${path}]];
+} -cleanup {
+    ::hudb::reset;
+    file delete ${path};
+    unset path;
+} -result {} -output {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}}
+
+# writing to stdout
+test hudb-to_file.3.1 "test writing file in json format" -setup {
+    set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::to_file -json
+} -cleanup {
+    ::hudb::reset
+} -result {} -output {{"a":{"b":{"c":"xyz"}},"b":{"c":123},"c":false}}
+
+# writing to a file
+test hudb-to_file.3.2 "test writing file in json format (file)" -setup {
+    set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+    set path [file join [file dirname [info script]] hudb-to_file.3.2];
+} -body {
+    ::hudb::to_file -json ${path};
+    puts -nonewline stdout [read [open ${path}]];
+} -cleanup {
+    ::hudb::reset;
+    file delete ${path};
+    unset path;
+} -result {} -output {{"a":{"b":{"c":"xyz"}},"b":{"c":123},"c":false}}
+
 
 #------------------------------------------------
 # end of unit tests

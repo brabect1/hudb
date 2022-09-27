@@ -435,6 +435,200 @@ namespace eval hudb {
         }
         return 1;
     }
+
+
+    proc to_file {args} {
+        array set _opts { db {} format huddle quiet 0}
+        set i 0;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -quiet {
+                    set _opts(quiet) 1;
+                }
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set name [lindex $args $i];
+                    if {[string match "-*" ${name}]} {
+                        error "Missing type for the -db option!";
+                    }
+                    set _opts(db) ${name};
+                }
+                -huddle {
+                    set _opts(format) "huddle";
+                }
+                -json {
+                    set _opts(format) "json";
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
+            }
+            incr i 1;
+        }; #while
+
+        if {$i < [llength $args] - 1} {
+            error "Too many arguments";
+        }
+
+        # get DB object
+        if {${_opts(db)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db)} db;
+        }
+
+        if {${_opts(format)} eq "huddle"} {
+            [namespace current]::_to_huddle_file "db" ${_opts(quiet)} [lindex $args $i];
+        } elseif {${_opts(format)} eq "json"} {
+            [namespace current]::_to_json_file "db" ${_opts(quiet)} [lindex $args $i];
+        } else {
+            error "Unsupported file format '${_opts(format)}'!";
+        }
+    }
+
+
+    proc _to_huddle_file {db_name quiet path} {
+        upvar ${db_name} db;
+
+        # load data from files
+        set fl stdout;
+        if {${path} ne {}} {
+            if {[catch {set fl [open ${path} w]} err]} {
+                if {${quiet} == 0} { error ${err}; }
+                return;
+            }
+        }
+
+        puts -nonewline ${fl} ${db};
+
+        if {${path} ne {}} {
+            if {[catch {close $fl} err]} {
+                if {${quiet} == 0} { error ${err}; }
+            }
+        }
+    }
+
+
+    proc _to_json_file {db_name quiet path} {
+        upvar ${db_name} db;
+
+        # load data from files
+        set fl stdout;
+        if {${path} ne {}} {
+            if {[catch {set fl [open ${path} w]} err]} {
+                if {${quiet} == 0} { error ${err}; }
+                return;
+            }
+        }
+
+        puts -nonewline ${fl} [huddle::jsondump ${db} "" ""];
+
+        if {${path} ne {}} {
+            if {[catch {close $fl} err]} {
+                if {${quiet} == 0} { error ${err}; }
+            }
+        }
+    }
+
+
+    # Loads data from DB files.
+    #
+    # TODO: Presently loads data from the 1st file only, others are ignored.
+    #
+    # Prototype::
+    #
+    #     from_files [-db <varName>] [-quiet] [-huddle|-json] <filePaths>
+    #
+    # When `-quiet`, no errors will be reported for non-existing files.
+    #
+    # When no file paths given, nothing happens (except reporting errors for
+    # other options).
+    proc from_files {args} {
+        array set _opts { db {} format huddle quiet 0}
+        set i 0;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -quiet {
+                    set _opts(quiet) 1;
+                }
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set name [lindex $args $i];
+                    if {[string match "-*" ${name}]} {
+                        error "Missing type for the -db option!";
+                    }
+                    set _opts(db) ${name};
+                }
+                -huddle {
+                    set _opts(format) "huddle";
+                }
+                -json {
+                    set _opts(format) "json";
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
+            }
+            incr i 1;
+        }; #while
+
+        # get DB object
+        if {${_opts(db)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db)} db;
+        }
+
+        if {${_opts(format)} eq "huddle"} {
+            [namespace current]::_from_huddle_files "db" $quiet [lrange $args $i end];
+        } else {
+            error "Unsupported file format '${_opts(format)}'!";
+        }
+    }
+
+    proc _from_huddle_files {db_name quiet paths} {
+        upvar ${db_name} db;
+
+        # load data from files
+        foreach path ${paths} {
+            if {![file exists ${path}] || [file isdirectory ${path}]} {
+                if {${quiet} == 0} { error "Not a file: '${path}'"; }
+                continue;
+            }
+
+            if {[catch {set fl [open ${path}]} err]} {
+                if {${quiet} == 0} { error ${err}; }
+                continue;
+            }
+
+            if {[catch {set newdb [read ${fl}]} err]} {
+                catch {close $fl};
+                if {${quiet} == 0} { error ${err}; }
+                continue;
+            }
+
+            # TODO
+            set db ${newdb};
+
+            if {[catch {close $fl} err]} {
+                if {${quiet} == 0} { error ${err}; }
+                continue;
+            }
+
+            #TODO skip all but the 1st file
+            break;
+        }
+    }
 }
 
 ## ##puts "isHuddle=[huddle isHuddle $::hudb::db]"
