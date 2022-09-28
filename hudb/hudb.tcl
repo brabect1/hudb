@@ -590,7 +590,7 @@ namespace eval hudb {
         }
 
         if {${_opts(format)} eq "huddle"} {
-            [namespace current]::_from_huddle_files "db" $quiet [lrange $args $i end];
+            [namespace current]::_from_huddle_files "db" ${_opts(quiet)} [lrange $args $i end];
         } else {
             error "Unsupported file format '${_opts(format)}'!";
         }
