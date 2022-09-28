@@ -115,14 +115,14 @@ namespace eval hudb {
     huddle addType "[namespace current]::huddle::uri";
 
 
-    proc reset {} {
-        namespace upvar [namespace current] db db;
+    proc _reset {db_name} {
+        upvar ${db_name} db;
         set db {HUDDLE {D {}}};
     }
 
 
-    proc is_wellformed {} {
-        namespace upvar [namespace current] db db;
+    proc _is_wellformed {db_name} {
+        upvar ${db_name} db;
         if {![huddle isHuddle ${db}]} {
             return 0;
         }
@@ -135,11 +135,9 @@ namespace eval hudb {
     }
 
 
-    proc is_empty {} {
-#@        puts "[namespace current]"
-#@        puts "[namespace which -variable db]"
-        namespace upvar [namespace current] db db;
-        if {![is_wellformed]} {
+    proc _is_empty {db_name} {
+        upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
             error "Malformed DB!";
         }
         lassign [huddle unwrap ${db}] head src;
@@ -147,11 +145,134 @@ namespace eval hudb {
     }
 
 
+    proc reset {args} {
+        set db_name {};
+        set i 0;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set db_name [lindex $args $i];
+                    if {[string match "-*" ${name}]} {
+                        error "Missing type for the -db option!";
+                        set db_name {};
+                    }
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
+            }
+            incr i 1;
+        }; #while
+
+        if {$i < [llength $args] - 1} {
+            error "Too many arguments";
+        }
+
+        # get DB object
+        if {${db_name} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${db_name} db;
+        }
+
+        _reset "db";
+    }
+
+
+    proc is_wellformed {args} {
+        set db_name {};
+        set i 0;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set db_name [lindex $args $i];
+                    if {[string match "-*" ${name}]} {
+                        error "Missing type for the -db option!";
+                        set db_name {};
+                    }
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
+            }
+            incr i 1;
+        }; #while
+
+        if {$i < [llength $args] - 1} {
+            error "Too many arguments";
+        }
+
+        # get DB object
+        if {${db_name} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${db_name} db;
+        }
+
+        return [_is_wellformed "db"];
+    }
+
+
+    proc is_empty {args} {
+#@        puts "[namespace current]"
+#@        puts "[namespace which -variable db]"
+
+        set db_name {};
+        set i 0;
+        while {$i < [llength $args]} {
+            switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set db_name [lindex $args $i];
+                    if {[string match "-*" ${name}]} {
+                        error "Missing type for the -db option!";
+                        set db_name {};
+                    }
+                }
+                -- { incr i 1; break; }
+                -* {
+                    error "Unknown option [lindex $args $i]";
+                }
+                default {
+                    break;
+                }
+            }
+            incr i 1;
+        }; #while
+
+        if {$i < [llength $args] - 1} {
+            error "Too many arguments";
+        }
+
+        # get DB object
+        if {${db_name} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${db_name} db;
+        }
+
+        return [_is_empty "db"];
+    }
+
+
     proc set_key {args} {
         if {[llength ${args}] == 0} { return; }
         namespace upvar [namespace current] db db;
         namespace upvar [namespace current] separator sep;
-        if {![is_wellformed]} {
+        if {![_is_wellformed "db"]} {
             error "Malformed DB!";
         }
 
@@ -254,7 +375,7 @@ namespace eval hudb {
         if {[llength $args] < 1} { error "Wrong number of arguments"; }
         namespace upvar [namespace current] db db;
         namespace upvar [namespace current] separator sep;
-        if {![is_wellformed]} {
+        if {![_is_wellformed "db"]} {
             error "Malformed DB!";
         }
 
@@ -310,7 +431,7 @@ namespace eval hudb {
     proc delete_key {args} {
         namespace upvar [namespace current] db db;
         namespace upvar [namespace current] separator sep;
-        if {![is_wellformed]} {
+        if {![_is_wellformed "db"]} {
             error "Malformed DB!";
         }
 
@@ -344,7 +465,7 @@ namespace eval hudb {
     proc exists_key {args} {
         namespace upvar [namespace current] db db;
         namespace upvar [namespace current] separator sep;
-        if {![is_wellformed]} {
+        if {![_is_wellformed "db"]} {
             error "Malformed DB!";
         }
 
@@ -399,7 +520,7 @@ namespace eval hudb {
         if {[llength $args] < 1} { error "Wrong number of arguments"; }
         namespace upvar [namespace current] db db;
         namespace upvar [namespace current] separator sep;
-        if {![is_wellformed]} {
+        if {![_is_wellformed "db"]} {
             error "Malformed DB!";
         }
 
@@ -644,6 +765,7 @@ namespace eval hudb {
             break;
         }
     }
+
 }
 
 ## ##puts "isHuddle=[huddle isHuddle $::hudb::db]"
