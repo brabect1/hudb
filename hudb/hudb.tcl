@@ -62,17 +62,32 @@ namespace eval hudb {
     # file path related API
     namespace eval filepath {
 
-        # Returns the given path as relative to the base_dir
+        # Returns the given `path` as relative to the `tgt_dir` folder.
         #
-        # If any of the arguments is a relative path, it will be
-        # interpretted as relative to the current working path as
-        # given by `pwd`.
-        proc rebase {base_dir path} {
-            set base_dir [file normalize $base_dir];
-            set path [file normalize $path];
+        # If the `path` argument is a relative path, it will be
+        # interpretted as relative to the `src_dir` path (which
+        # defaults to `.` and hence the current working directory).
+        # The `tgt_dir` as a relative path would be always interpretted
+        # as relative to the current working directory.
+        #
+        # None of the paths is tested for existence or the type of the
+        # file object. `tgt_dir` and `src_dir` are always assumed to be
+        # folders
+        #
+        # Note that if `path` is an absolute path that shall remain
+        # absolute, there is no need to call `rebase` at all (as it
+        # would change it into a relative path).
+        #
+        proc rebase {tgt_dir path {src_dir .}} {
+            set tgt_dir [file normalize $tgt_dir];
+            if {[file pathtype $path] eq "absolute"} {
+                set path [file normalize $path];
+            } else {
+                set path [file normalize [file join $src_dir $path]];
+            }
             set separator [file separator];
 
-            set base_parts [file split $base_dir]
+            set base_parts [file split $tgt_dir]
             set path_parts [file split $path]
             set i 0;
             foreach bpart $base_parts ppart $path_parts {

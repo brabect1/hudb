@@ -840,7 +840,82 @@ test hudb-filepath_rebase.1.4 "test of path rebase (abs path to root base)" -bod
     ::hudb::filepath::rebase / /e/f/g
 } -result {e/f/g}
 
-#TODO test other combinations of relative and absolute paths
+test hudb-filepath_rebase.2.1.1 "test of path rebase (abs tgt, rel path)" -body {
+    ::hudb::filepath::rebase /a/b e/f /c/d
+} -result {../../c/d/e/f}
+
+test hudb-filepath_rebase.2.1.2 "test of path rebase (abs tgt, rel path)" -body {
+    ::hudb::filepath::rebase /a/b ./e/f /c/d/.
+} -result {../../c/d/e/f}
+
+test hudb-filepath_rebase.2.2.1 "test of path rebase, same dir (abs tgt, rel path)" -body {
+    ::hudb::filepath::rebase /a/b e/f /a/b
+} -result {e/f}
+
+test hudb-filepath_rebase.2.2.2 "test of path rebase, same dir (abs tgt, rel path)" -body {
+    ::hudb::filepath::rebase /a/b e/f /a/./b/c/..
+} -result {e/f}
+
+test hudb-filepath_rebase.3.1.1 "test of path rebase (rel tgt, rel path, default src)" -body {
+    ::hudb::filepath::rebase a/b e/f
+} -result {../../e/f}
+
+test hudb-filepath_rebase.3.1.2 "test of path rebase (rel tgt, rel path, default src)" -body {
+    ::hudb::filepath::rebase ./a//b/ ../e/f
+} -result {../../../e/f}
+
+test hudb-filepath_rebase.3.2.1 "test of path rebase, same dir (rel tgt, rel path, default src)" -body {
+    ::hudb::filepath::rebase a/b a//b/./e/f
+} -result {e/f}
+
+test hudb-filepath_rebase.3.2.2 "test of path rebase, same dir (rel tgt, rel path, default src)" -body {
+    ::hudb::filepath::rebase ../a/b ./../a/b/e/f
+} -result {e/f}
+
+test hudb-filepath_rebase.3.3.1 "test of path rebase (rel tgt, rel path, abs src)" -body {
+    ::hudb::filepath::rebase a/b e/f [file normalize [pwd]]
+} -result {../../e/f}
+
+test hudb-filepath_rebase.3.3.2 "test of path rebase (rel tgt, rel path, abs src)" -body {
+    ::hudb::filepath::rebase ./a//b/ ../e/f [file normalize [pwd]]
+} -result {../../../e/f}
+
+test hudb-filepath_rebase.3.4.1 "test of path rebase, same dir (rel tgt, rel path, abs src)" -body {
+    ::hudb::filepath::rebase a/b a//b/./e/f [file normalize [pwd]]
+} -result {e/f}
+
+test hudb-filepath_rebase.3.4.2 "test of path rebase, same dir (rel tgt, rel path, abs src)" -body {
+    ::hudb::filepath::rebase ../a/b ./../a/b/e/f [file normalize [pwd]]
+} -result {e/f}
+
+test hudb-filepath_rebase.3.5.1 "test of path rebase, same dir (rel tgt, rel path, rel src)" -body {
+    ::hudb::filepath::rebase a/b e/f a/b
+} -result {e/f}
+
+test hudb-filepath_rebase.3.5.2 "test of path rebase, same dir (rel tgt, rel path, rel src)" -body {
+    ::hudb::filepath::rebase ../a/b ./e/f c/../../a/b/.
+} -result {e/f}
+
+test hudb-filepath_rebase.3.5.3 "test of path rebase, same dir (rel tgt, rel path, rel src)" -body {
+    ::hudb::filepath::rebase a/b a/b/e/f a/b
+} -result {a/b/e/f}
+
+test hudb-filepath_rebase.3.6.1 "test of path rebase (abs tgt, rel path, default src)" -body {
+    ::hudb::filepath::rebase [file join [file normalize [pwd]] a/b] e/f
+} -result {../../e/f}
+
+test hudb-filepath_rebase.3.6.2 "test of path rebase (abs tgt, rel path, default src)" -body {
+    ::hudb::filepath::rebase [file join [file normalize [pwd]] a/b] ../e/f
+} -result {../../../e/f}
+
+test hudb-filepath_rebase.3.7.1 "test of path rebase (abs tgt, rel path, abs src)" -body {
+    ::hudb::filepath::rebase [file join [file normalize [pwd]] a/b] e/f [file join [file normalize [pwd]] c/d]
+} -result {../../c/d/e/f}
+
+test hudb-filepath_rebase.3.8.1 "test of path rebase (abs tgt, abs path, abs src)" -body {
+    ::hudb::filepath::rebase [file join [file normalize [pwd]] a/b] \
+        [file join [file normalize [pwd]] e/f] [file join [file normalize [pwd]] c/d]
+} -result {../../e/f}
 
 
 #------------------------------------------------
