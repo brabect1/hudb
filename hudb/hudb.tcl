@@ -50,12 +50,6 @@ namespace eval hudb {
             upvar 1 $node_var node;
 
             set tag [lindex $node 0];
-            #TODO lassign $node tag value;
-
-            #TODO # We replace the value in the $node with an empty
-            #TODO # value. Then only the $value holds the original
-            #TODO # value.
-            #TODO lset node 1 {}
 
             if {![info exists types(type:$tag)] || ![info exists types(isContainer:$tag)]} {
                 error "Unrecognized huddle node type: '$tag'";
@@ -66,6 +60,7 @@ namespace eval hudb {
 
                 # see if to traverse deeper (and hence if to visit sub-nodes)
                 if {[dict get $resp "ascend"] != 1 || [dict get $resp "stop"] != 1} {
+                    set repack 0; # flag to indicate the container value changed
                     set value [lindex $node 1];
                     foreach item [$types(callback:$tag) items $value] {
                         lassign $item key subnode;
@@ -78,11 +73,9 @@ namespace eval hudb {
                         # see if the sub-node changed (and, if so, re-pack it into the container
                         # node)
                         if {[dict get ${subresp} "repack"] == 1} {
-                            puts "1: [join $subpath "/"] -> $subnode";
-                            puts "2: $value";
                             $types(callback:$tag) delete_subnode_but_not_key value $key
                             $types(callback:$tag) set value $key $subnode
-                            puts "3: $value";
+                            set repack 1;
                         }
 
                         # see if to stop processing immediately
@@ -91,31 +84,17 @@ namespace eval hudb {
                             break;
                         }
                     }
+
+                    if {$repack == 1} {
+                        lset node 1 $value;
+                        dict set resp "repack" 1;
+                    }
                 }
 
                 return $resp;
-                #TODO # We get the fist key. This information is used in the recursive case ($len>1) and in the base case ($len==1).
-                #TODO set key [lindex $path 0]
-
-                #TODO set subnode [$types(callback:$tag) get_subnode $value $key]
-
-                #TODO # We delete the internal reference of $value to $subnode.
-                #TODO # Now refcount of $subnode is 1
-                #TODO $types(callback:$tag) delete_subnode_but_not_key value $key
-
-                #TODO Apply_to_subnode $subcommand subnode $len $subpath $subcommand_arguments
-
-                #TODO # We add again the new $subnode to the original $value
-                #TODO $types(callback:$tag) set value $key $subnode
-
-                #TODO # We add again the new $value to the parent node
-                #TODO lset node 1 $value
-
             } else {
                 # delegate response to the visitor/callback
                 return [eval ${callback} node \$path ${args}];
-                #TODO $types(callback:$tag) $subcommand value $key $subcommand_arguments
-                #TODO lset node 1 $value
             }
         }
     }
@@ -155,6 +134,26 @@ namespace eval hudb {
                     } $data
                 ];
                 return "\"$data\""
+            }
+
+            # A visitor/callback for hudb::Visit_node_depth_first that rebases
+            # relative file URI paths.
+            #
+            # Arguments:
+            #   node_var - name of a huddle node variable in the caller's stack frame
+            #   path - list of tokens making up a DB key
+            #   args[0] - target directory for URI path rebase
+            #   args[1] - source directory for URI path rebase
+            proc cb_rebase {node_var path args} {
+                namespace upvar [namespace current] settings settings;
+                upvar 1 $node_var node;
+                lassign $node tag value;
+                set sep ${::hudb::separator};
+                if {$tag eq [dict get ${settings} "tag"] && [file pathtype $value] eq "relative"} {
+                    lset node 1 [::hudb::filepath::rebase [lindex $args 0] $value [lindex $args 1]];
+                    return {stop 0 ascend 0 repack 1};
+                }
+                return {stop 0 ascend 0 repack 0};
             }
 
         }; # end of huddle::uri namespace
@@ -248,6 +247,14 @@ namespace eval hudb {
 
     proc _rebase_uris {db_name tgt_dir src_dir} {
         upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
+            error "Malformed DB!";
+        }
+        set node [huddle::unwrap ${db}];
+        set resp [huddle::Visit_node_depth_first [namespace current]::huddle::uri::cb_rebase node {} $tgt_dir $src_dir];
+        if {[dict get $resp "repack"] == 1} {
+            set db [huddle wrap $node];
+        }
     }
 
 
