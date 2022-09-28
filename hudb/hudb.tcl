@@ -18,6 +18,107 @@ namespace eval hudb {
     set db {HUDDLE {D {}}};
     set separator {/}
 
+    # infuse new routines for Huddle processing
+    # TODO as long as the routines are independent of other `hudb` code, they
+    #      shall move to the `huddle` code
+    namespace eval huddle {
+
+        # Performs depth-first traverse of the huddle structure, calling the
+        # given visitor `callback` for each huddle node being visited.
+        #
+        # Container nodes are passed to the visitor callback before traversing
+        # their subnodes. This way, the visitor may decide to cease diving
+        # deeper for that container node.
+        #
+        # Arguments:
+        #   callback - name of routine to be called on node visit
+        #   node_var - name of the variable holding the node representation
+        #   path - list of key tokens to the `node_var`
+        #   args - remaining arguments to be passed to the callback
+        #
+        # Callback prototype should look like::
+        #
+        #   proc my_callback {node_var path args} { ... }
+        #
+        # The callback shall return a flat dictionary with the following keys:
+        # - stop: Value of 1 will make the the visit traverse stop altogether
+        # - ascend: stop traversing to subnode
+        # - repack: Indicates that the node has been changed during the visit
+        #   and shall be repacked into the huddle structure.
+        proc Visit_node_depth_first {callback node_var path args} {
+            namespace upvar [namespace current] types types;
+            upvar 1 $node_var node;
+
+            set tag [lindex $node 0];
+            #TODO lassign $node tag value;
+
+            #TODO # We replace the value in the $node with an empty
+            #TODO # value. Then only the $value holds the original
+            #TODO # value.
+            #TODO lset node 1 {}
+
+            if {![info exists types(type:$tag)] || ![info exists types(isContainer:$tag)]} {
+                error "Unrecognized huddle node type: '$tag'";
+            } elseif { $types(isContainer:$tag) } {
+                # call the visitor/callback on the container node first
+                # (before calling it for its sub-nodes)
+                set resp [eval ${callback} node \$path ${args}];
+
+                # see if to traverse deeper (and hence if to visit sub-nodes)
+                if {[dict get $resp "ascend"] != 1 || [dict get $resp "stop"] != 1} {
+                    set value [lindex $node 1];
+                    foreach item [$types(callback:$tag) items $value] {
+                        lassign $item key subnode;
+                        set subpath ${path};
+                        lappend subpath $key;
+
+                        # call the visitor/callback (for a sub-node)
+                        set subresp [eval Visit_node_depth_first \${callback} subnode \$subpath ${args}];
+
+                        # see if the sub-node changed (and, if so, re-pack it into the container
+                        # node)
+                        if {[dict get ${subresp} "repack"] == 1} {
+                            puts "1: [join $subpath "/"] -> $subnode";
+                            puts "2: $value";
+                            $types(callback:$tag) delete_subnode_but_not_key value $key
+                            $types(callback:$tag) set value $key $subnode
+                            puts "3: $value";
+                        }
+
+                        # see if to stop processing immediately
+                        if {[dict get ${subresp} "stop"] == 1} {
+                            dict set resp "stop" 1;
+                            break;
+                        }
+                    }
+                }
+
+                return $resp;
+                #TODO # We get the fist key. This information is used in the recursive case ($len>1) and in the base case ($len==1).
+                #TODO set key [lindex $path 0]
+
+                #TODO set subnode [$types(callback:$tag) get_subnode $value $key]
+
+                #TODO # We delete the internal reference of $value to $subnode.
+                #TODO # Now refcount of $subnode is 1
+                #TODO $types(callback:$tag) delete_subnode_but_not_key value $key
+
+                #TODO Apply_to_subnode $subcommand subnode $len $subpath $subcommand_arguments
+
+                #TODO # We add again the new $subnode to the original $value
+                #TODO $types(callback:$tag) set value $key $subnode
+
+                #TODO # We add again the new $value to the parent node
+                #TODO lset node 1 $value
+
+            } else {
+                # delegate response to the visitor/callback
+                return [eval ${callback} node \$path ${args}];
+                #TODO $types(callback:$tag) $subcommand value $key $subcommand_arguments
+                #TODO lset node 1 $value
+            }
+        }
+    }
 
     # infuse new Huddle types into the `huddle` namespace
     namespace eval huddle {
@@ -142,6 +243,11 @@ namespace eval hudb {
         }
         lassign [huddle unwrap ${db}] head src;
         if {[llength ${src}] > 0} { return 0; } else { return 1; }
+    }
+
+
+    proc _rebase_uris {db_name tgt_dir src_dir} {
+        upvar ${db_name} db;
     }
 
 
