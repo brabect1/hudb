@@ -381,6 +381,27 @@ namespace eval hudb {
     }
 
 
+    # Sets a new key.
+    #
+    # Prototype::
+    #
+    #   set_key [-type <type>] [-raw] <key> <value>
+    #
+    # Arguments (after -* options):
+    #   args[end-1] - DB key
+    #   args[end] - value to be set
+    #
+    # The latter of `-type` and `-raw` overrides the other. That is, `-raw` and
+    # `-type` options are mutually exclusive.
+    #
+    # With `-raw` the value is supposed to be a Huddle node. With `-type <type>`,
+    # the value will be converted to the `<type>` Huddle node.
+    #
+    # TODO Container types such as `dict` and `list` are not supported at the moment.
+    #
+    # It is assumed that all the key parts represent an index into a huddle container.
+    # If that turns false for any but the last key part, an error is raised.
+    #
     proc set_key {args} {
         if {[llength ${args}] == 0} { return; }
         namespace upvar [namespace current] db db;
@@ -391,12 +412,12 @@ namespace eval hudb {
 
         if {[llength $args] < 2} { error "Wrong number of arguments"; }
         set tag s;
-        array set _opts { type {} json 0 }
+        array set _opts { type {} json 0 raw 0}
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
                 -type {
-                    if {[llength $args] < 4} { error "Wrong number of arguments"; }
+                    if {[llength $args] < $i+4} { error "Wrong number of arguments"; }
                     incr i 1;
                     set type [lindex $args $i];
                     if {${type} eq "--"} {
@@ -413,6 +434,11 @@ namespace eval hudb {
                         error "Container types not supported. Use -json option."
                     }
                     set _opts(type) ${type};
+                    set _opts(raw) 0; # override raw value
+                }
+                -raw {
+                    if {[llength $args] < $i+3} { error "Wrong number of arguments"; }
+                    set _opts(raw) 1;
                 }
                 -- { incr i 1; break; }
                 -* {
@@ -428,8 +454,33 @@ namespace eval hudb {
         if {$i+2 != [llength $args]} {
             error "Too many arguments! Args: ${args}";
         }
-        set path [split [lindex $args end-1] ${sep}]
-#@        puts "path=$path";
+
+        _set_key db [lindex $args end-1] [lindex $args end] ${tag} ${_opts(raw)};
+    }
+
+
+    proc _set_key {db_name key value tag {raw 0}} {
+        upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
+            error "Malformed DB!";
+        }
+
+        namespace upvar [namespace current] separator sep;
+        set path [split ${key} ${sep}]
+
+        # remove leading empty key part (and do nothing if
+        # no non-empty key part remains)
+        set i 0;
+        foreach p ${path} {
+            if {$p ne {}} {
+                break;
+            }
+            incr i 1;
+        }
+        if {$i == [llength $path]} { return; }
+
+        # get the normalized key parts
+        set path [lrange $path $i end];
 
         # see if the path already exists
         set i 0;
@@ -463,14 +514,22 @@ namespace eval hudb {
 #@            puts "i=$i (of [llength $path]), subpath=[lrange $path $i end]"
             set root_node [huddle unwrap ${new_dict}];
 #@            puts "root_node=${root_node}"
-            set subnode [huddle::argument_to_node [lindex $args end] ${tag}];
+            if {${raw} == 0} {
+                set subnode [huddle::argument_to_node ${value} ${tag}];
+            } else {
+                set subnode ${value}
+            }
 #@            puts "subnode=${subnode} (tag=$tag)"
             set subpath [lrange $path $i+1 end]
             huddle::Apply_to_subnode set root_node [llength $subpath] $subpath $subnode
 #@            puts "root_node=${root_node}"
             set subnode ${root_node};
         } else {
-            set subnode [huddle::argument_to_node [lindex $args end] ${tag}]
+            if {${raw} == 0} {
+                set subnode [huddle::argument_to_node ${value} ${tag}];
+            } else {
+                set subnode ${value};
+            }
         }
         set root_node [huddle unwrap $db]
 
@@ -847,6 +906,7 @@ namespace eval hudb {
 
     proc _from_huddle_files {db_name quiet paths} {
         upvar ${db_name} db;
+        namespace upvar [namespace current] separator sep;
 
         # load data from files
         foreach path ${paths} {
@@ -866,16 +926,54 @@ namespace eval hudb {
                 continue;
             }
 
-            # TODO
-            set db ${newdb};
-
             if {[catch {close $fl} err]} {
                 if {${quiet} == 0} { error ${err}; }
+            }
+
+            # see if the loaded DB is a dictionary
+            # (if not, it will be disregarded as it 
+            # TODO: If DB were allowed to have arbitrary structure, then a non-dictionary
+            #       the loaded DB would just overwrite the whole DB. Maybe the list type
+            #       would need to be treated specifically.
+            set newdb_rn [huddle::unwrap ${newdb}];
+            lassign ${newdb_rn} newdb_rn_tag newdb_rn_val;
+            if {![info exists huddle::types(type:${newdb_rn_tag})]} {
+                # unknown type -> ignore
+                continue;
+            } elseif {$huddle::types(type:${newdb_rn_tag}) ne "dict"} {
+                # not a dictionary -> ignore
                 continue;
             }
 
-            #TODO skip all but the 1st file
-            break;
+            # merge individual items at 1st level; items that are not dictionaries
+            # are ignored
+            # (that is, sub-items at the 2nd level will get added to DB
+            # irrsepective if that sub-item already existed there)
+            foreach item [$huddle::types(callback:${newdb_rn_tag}) items ${newdb_rn_val}] {
+                lassign $item key subnode;
+
+                # skip all but dictionary type items
+                lassign ${subnode} sn_tag sn_val;
+                if {![info exists huddle::types(type:${sn_tag})]} {
+                    # unknown type -> ignore
+                    continue;
+                } elseif {$huddle::types(type:${sn_tag}) ne "dict"} {
+                    # not a dictionary -> ignore
+                    continue;
+                }
+
+                # put subitems into the DB
+                foreach subitem [$huddle::types(callback:${sn_tag}) items ${sn_val}] {
+                    lassign $subitem subkey subsubnode;
+                    _set_key db "${key}${sep}${subkey}" ${subsubnode} {} 1;
+                }
+            }
+
+##            # TODO
+##            set db ${newdb};
+
+##            #TODO skip all but the 1st file
+##            break;
         }
     }
 

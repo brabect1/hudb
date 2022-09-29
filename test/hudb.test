@@ -366,6 +366,51 @@ test hudb-set_key.13.4 "test set (weird key)" -setup {
 } -result {HUDDLE {D {}}}
 
 
+test hudb-set_key.14.1.1 "test set -raw (boolean)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -raw x/y/z {b false};
+    assert {![::hudb::is_empty]}
+    set db $::hudb::db;
+} -result {HUDDLE {D {x {D {y {D {z {b false}}}}}}}}
+
+
+test hudb-set_key.14.1.2 "test set -raw (string)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -raw x {s {my string}};
+    assert {![::hudb::is_empty]}
+    set db $::hudb::db;
+} -result {HUDDLE {D {x {s {my string}}}}}
+
+
+test hudb-set_key.14.1.3 "test set -raw (number)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -raw x/0 {num 1.21};
+    assert {![::hudb::is_empty]}
+    set db $::hudb::db;
+} -result {HUDDLE {D {x {D {0 {num 1.21}}}}}}
+
+
+test hudb-set_key.14.1.4 "test set -raw (list)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -raw x {L {{s a} {s b} {s c}}};
+    assert {![::hudb::is_empty]}
+    set db $::hudb::db;
+} -result {HUDDLE {D {x {L {{s a} {s b} {s c}}}}}}
+
+
+test hudb-set_key.14.1.5 "test set -raw (dict)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -raw x {D {0 {num 1.21}}};
+    assert {![::hudb::is_empty]}
+    set db $::hudb::db;
+} -result {HUDDLE {D {x {D {0 {num 1.21}}}}}}
+
+
 #------------------------------------------------
 # hudb::exists_key
 #------------------------------------------------
@@ -993,7 +1038,23 @@ test hudb-to_file.3.2 "test writing file in json format (file)" -setup {
 #------------------------------------------------
 
 # reading into the default DB
-test hudb-from_files.2.1 "test reading a single file in huddle format" -setup {
+test hudb-from_files.2.1.1 "test reading a single file in huddle format" -setup {
+    set path [file join [file dirname [info script]] hudb-from_files-2.1];
+    set fl [open $path w];
+    puts -nonewline $fl {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {D {d {b false}}}}}};
+    close $fl;
+    ::hudb::reset;
+} -body {
+    ::hudb::from_files -huddle $path;
+    return ${::hudb::db};
+} -cleanup {
+    ::hudb::reset;
+    file delete $path;
+    unset fl path;
+} -result {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {D {d {b false}}}}}}
+
+# reading into the default DB (ignoring non-dict 1st-level items)
+test hudb-from_files.2.1.1 "test reading a single file in huddle format (ignore non-dict 1st level items)" -setup {
     set path [file join [file dirname [info script]] hudb-from_files-2.1];
     set fl [open $path w];
     puts -nonewline $fl {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
@@ -1006,17 +1067,17 @@ test hudb-from_files.2.1 "test reading a single file in huddle format" -setup {
     ::hudb::reset;
     file delete $path;
     unset fl path;
-} -result {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}}
+} -result {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}}}}}
 
 # reading into a custom DB
-test hudb-from_files.2.2 "test reading a single file in huddle format" -setup {
-    set exp {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+test hudb-from_files.2.2.1 "test reading a single file in huddle format" -setup {
+    set exp {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {D {d {b false}}}}}};
     set path [file join [file dirname [info script]] hudb-from_files-2.2];
     set fl [open $path w];
     puts -nonewline $fl $exp;
     close $fl;
     ::hudb::reset;
-    set db {};
+    set db {HUDDLE {D {}}};
 } -body {
     set result 0;
     ::hudb::from_files -db db -huddle $path;
