@@ -13,12 +13,21 @@
 # limitations under the License.
 
 package require tcltest
-package require control
-
 namespace import ::tcltest::*
 
-control::control assert enabled 1
-namespace import ::control::assert
+# import the `control` package
+if {[catch {package require control}]} {
+    # `control` not available so make a custom substitute
+    # (code origin: https://wiki.tcl-lang.org/page/Assertions)
+    proc assert {condition} {
+        if {![uplevel 1 expr $condition]} {
+            return -code error "assertion failed: $condition"
+        }
+    }
+} else {
+    control::control assert enabled 1;
+    namespace import ::control::assert;
+}
 
 source [file join [file dirname [info script]] .. hudb hudb.tcl];
 
