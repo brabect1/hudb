@@ -215,6 +215,35 @@ namespace eval hudb {
     huddle addType "[namespace current]::huddle::uri";
 
 
+    # Returns a fully qualified name of internal DB object.
+    #
+    # This routine helps to identify the internal DB object if users need to
+    # manipulate it directly or need to pass it to `huddb::_*` routines meant
+    # for internal use.
+    #
+    # To get a fully qualified name of the DB parent namespace use:
+    #
+    #     namespace qualifiers [hudb::_get_db_ref]
+    #
+    # To get a simple name of the DB object variable, use:
+    #
+    #     namespace tail [hudb::_get_db_ref]
+    #
+    proc _get_db_ref {} {
+        return [namespace which -variable db];
+    }
+
+
+    # Resets a DB object identified by its variable name, `db_name`.
+    #
+    # Resetting will make the referenced DB empty. The routine may hence also
+    # be used to get the empty DB representation.
+    #
+    # DB obj is referenced through `upvar` (with the default level) and hence
+    # has to exist in the caller's frame stack (either directly or through
+    # another `upvar` reference) or be a global variable, or it has to refer
+    # to a fully qualified namespace variable (such as given by `hudb::_get_db_conf`.
+    #
     proc _reset {db_name} {
         upvar ${db_name} db;
         set db {HUDDLE {D {}}};
@@ -245,6 +274,19 @@ namespace eval hudb {
     }
 
 
+    # Changes relative paths in a DB object referenced by `db_name` so that
+    # the paths assumed to be relative to `src_dir` become relative to `tgt_dir`.
+    #
+    # Neither of the dir arguments is checked for existence or file type. It is
+    # up to the caller to ensure they are meaningful.
+    #
+    # The routine traverses the entire DB tree structure and for every URI type
+    # performs the check for being a relative file paths and then rebases it
+    # from `src_dir` to `tgt_dir`. This travers does occur even if the source
+    # and target directories resolve into the same path; this is intentional
+    # for testing purposes. For performance reasons, users shall do an file
+    # path equivalence check prior to calling `_rebase_uris`.
+    #
     proc _rebase_uris {db_name tgt_dir src_dir} {
         upvar ${db_name} db;
         if {![_is_wellformed "db"]} {

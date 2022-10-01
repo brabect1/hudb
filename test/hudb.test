@@ -42,6 +42,71 @@ skip {
 
 
 #------------------------------------------------
+# hudb::_get_db_ref
+#------------------------------------------------
+test hudb-_get_db_ref.1 "test of getting a fully qulified name of internal DB obejct" -body {
+    ::hudb::_get_db_ref;
+} -result {::hudb::db}
+
+
+#------------------------------------------------
+# hudb::_reset
+#------------------------------------------------
+test hudb-_reset.1 "test of resetting a local DB object" -setup {
+    set ::hudb::db {foo bar};
+    set db {hello world};
+} -body {
+    set result 0;
+    ::hudb::_reset db;
+
+    # test local variable
+    set exp {HUDDLE {D {}}};
+    if {$db ne $exp} {
+        incr result $i;
+        error "Unexpected local DB:\n\tact=$db\n\texp=$exp";
+    }
+
+    # test internal DB variable
+    set exp {foo bar};
+    if {$::hudb::db ne $exp} {
+        incr result $i;
+        error "Unexpected internal DB:\n\tact=$db\n\texp=$exp";
+    }
+
+    return $result;
+} -cleanup {
+    unset db exp;
+} -result {0}
+
+
+test hudb-_reset.2 "test of resetting a hudb internal DB object" -setup {
+    set ::hudb::db {foo bar};
+    set db {hello world};
+} -body {
+    set result 0;
+    ::hudb::_reset [::hudb::_get_db_ref];
+
+    # test local variable
+    set exp {hello world};
+    if {$db ne $exp} {
+        incr result $i;
+        error "Unexpected local DB:\n\tact=$db\n\texp=$exp";
+    }
+
+    # test internal DB variable
+    set exp {HUDDLE {D {}}};
+    if {$::hudb::db ne $exp} {
+        incr result $i;
+        error "Unexpected internal DB:\n\tact=$db\n\texp=$exp";
+    }
+
+    return $result;
+} -cleanup {
+    unset db exp;
+} -result {0}
+
+
+#------------------------------------------------
 # hudb::reset
 #------------------------------------------------
 test hudb-reset.1 "test of reset empty DB" -setup {
