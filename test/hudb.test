@@ -1104,7 +1104,7 @@ test hudb-to_file.3.2 "test writing file in json format (file)" -setup {
 
 # reading into the default DB
 test hudb-from_files.2.1.1 "test reading a single file in huddle format" -setup {
-    set path [file join [file dirname [info script]] hudb-from_files-2.1];
+    set path [file join [file dirname [info script]] hudb-from_files-2.1.1];
     set fl [open $path w];
     puts -nonewline $fl {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {D {d {b false}}}}}};
     close $fl;
@@ -1119,8 +1119,8 @@ test hudb-from_files.2.1.1 "test reading a single file in huddle format" -setup 
 } -result {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {D {d {b false}}}}}}
 
 # reading into the default DB (ignoring non-dict 1st-level items)
-test hudb-from_files.2.1.1 "test reading a single file in huddle format (ignore non-dict 1st level items)" -setup {
-    set path [file join [file dirname [info script]] hudb-from_files-2.1];
+test hudb-from_files.2.1.2 "test reading a single file in huddle format (ignore non-dict 1st level items)" -setup {
+    set path [file join [file dirname [info script]] hudb-from_files-2.1.2];
     set fl [open $path w];
     puts -nonewline $fl {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
     close $fl;
@@ -1137,7 +1137,7 @@ test hudb-from_files.2.1.1 "test reading a single file in huddle format (ignore 
 # reading into a custom DB
 test hudb-from_files.2.2.1 "test reading a single file in huddle format" -setup {
     set exp {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {D {d {b false}}}}}};
-    set path [file join [file dirname [info script]] hudb-from_files-2.2];
+    set path [file join [file dirname [info script]] hudb-from_files-2.2.1];
     set fl [open $path w];
     puts -nonewline $fl $exp;
     close $fl;
@@ -1160,6 +1160,36 @@ test hudb-from_files.2.2.1 "test reading a single file in huddle format" -setup 
     file delete $path;
     unset fl path db exp;
 } -result {0}
+
+# reading multiple files (default DB)
+test hudb-from_files.3.1 "test reading a multiple files in huddle format" -setup {
+    set basepath [file join [file dirname [info script]] hudb-from_files-3.1];
+    set paths {};
+    set inputs {
+        A {HUDDLE {D {a {D {b {D {c {s A}}}}} b {D {x {num 1}}} A {D {d {s A}}}}}}
+        B {HUDDLE {D {a {D {c {s B}}} b {D {x {num 2}}} B {D {d {s B}}}}}}
+        C {HUDDLE {D {a {D {b {D {d {s C}}} d {s C}}} b {D {x {num 3}}} C {D {d {s C}}}}}}
+    };
+    foreach k [dict keys ${inputs}] {
+        set path "${basepath}${k}";
+        set fl [open ${path} w];
+        puts -nonewline $fl [dict get ${inputs} ${k}];
+        close $fl;
+        lappend paths ${path};
+        unset fl path;
+    }
+    unset inputs basepath;
+    ::hudb::reset;
+} -body {
+    eval ::hudb::from_files -huddle ${paths};
+    return ${::hudb::db};
+} -cleanup {
+    ::hudb::reset;
+    foreach path ${paths} {
+        file delete $path;
+    }
+    unset -nocomplain path paths;
+} -result {HUDDLE {D {a {D {b {D {d {s C}}} c {s B} d {s C}}} b {D {x {num 3}}} A {D {d {s A}}} B {D {d {s B}}} C {D {d {s C}}}}}}
 
 
 #------------------------------------------------
