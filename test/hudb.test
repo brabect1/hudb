@@ -1069,6 +1069,48 @@ test hudb-to_file.2.2 "test writing file in huddle format (file)" -setup {
     unset path;
 } -result {} -output {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}}
 
+# writing to stdout incl. rebasing relative file paths
+test hudb-to_file.2.3 "test writing file in huddle format and rebasing URIs (stdout)" -setup {
+    set ::hudb::db {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri a/b/c} c {uri ../a/b/c}}}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+
+    # change to a new PWD
+    set cwd_bak [file normalize [pwd]]; cd "/";
+} -body {
+    ::hudb::to_file -huddle
+} -cleanup {
+    # change back to original PWD
+    cd ${cwd_bak};
+    unset cwd_bak;
+    ::hudb::reset
+} -result {} -output {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri a/b/c} c {uri ../a/b/c}}}}}}
+
+# writing to a file incl. rebasing relative file paths
+test hudb-to_file.2.4 "test writing file in huddle format and rebasing URIs (file)" -setup {
+    set ::hudb::db {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri a/b/c} c {uri ../a/b/c}}}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+    set path [file join [file normalize [file dirname [info script]]] hudb-to_file.2.4];
+    file mkdir ${path};
+
+    # change to a new PWD
+    set cwd_bak [file normalize [pwd]];
+    cd [file dirname ${path}];
+} -body {
+    ::hudb::to_file -huddle [file join ${path} output_db];
+    puts -nonewline stdout [read [open [file join ${path} output_db]]];
+} -cleanup {
+    ::hudb::reset;
+    # change back to original PWD
+    cd ${cwd_bak};
+    file delete [file join ${path} output_db];
+    file delete ${path}
+    unset path cwd_bak;
+} -result {} -output {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri ../a/b/c} c {uri ../../a/b/c}}}}}}
+
 # writing to stdout
 test hudb-to_file.3.1 "test writing file in json format" -setup {
     set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
@@ -1096,6 +1138,48 @@ test hudb-to_file.3.2 "test writing file in json format (file)" -setup {
     file delete ${path};
     unset path;
 } -result {} -output {{"a":{"b":{"c":"xyz"}},"b":{"c":123},"c":false}}
+
+# writing to stdout incl. rebasing relative file paths
+test hudb-to_file.3.3 "test writing file in JSON format and rebasing URIs (stdout)" -setup {
+    set ::hudb::db {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri a/b/c} c {uri ../a/b/c}}}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+
+    # change to a new PWD
+    set cwd_bak [file normalize [pwd]]; cd "/";
+} -body {
+    ::hudb::to_file -json
+} -cleanup {
+    # change back to original PWD
+    cd ${cwd_bak};
+    unset cwd_bak;
+    ::hudb::reset
+} -result {} -output {{"paths":{"a":"/a/b/c","b":"a/b/c","c":"../a/b/c"}}}
+
+# writing to a file incl. rebasing relative file paths
+test hudb-to_file.3.4 "test writing file in JSON format and rebasing URIs (file)" -setup {
+    set ::hudb::db {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri a/b/c} c {uri ../a/b/c}}}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+    set path [file join [file normalize [file dirname [info script]]] hudb-to_file.3.4];
+    file mkdir ${path};
+
+    # change to a new PWD
+    set cwd_bak [file normalize [pwd]];
+    cd [file dirname ${path}];
+} -body {
+    ::hudb::to_file -json [file join ${path} output_db];
+    puts -nonewline stdout [read [open [file join ${path} output_db]]];
+} -cleanup {
+    ::hudb::reset;
+    # change back to original PWD
+    cd ${cwd_bak};
+    file delete [file join ${path} output_db];
+    file delete ${path}
+    unset path cwd_bak;
+} -result {} -output {{"paths":{"a":"/a/b/c","b":"../a/b/c","c":"../../a/b/c"}}}
 
 
 #------------------------------------------------
@@ -1216,6 +1300,90 @@ test hudb-from_files.4.1 "test rebasing on reading a single file in huddle forma
     file delete $path;
     unset fl path cwd_bak;
 } -result  {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri hudb-from_files-4.1/a/b/c} c {uri a/b/c}}}}}};
+
+
+#------------------------------------------------
+# huddle::uri
+#------------------------------------------------
+
+# create
+# ------
+test huddle-uri-create.1.1 "test of creating huddle::uri (abs path)" -body {
+    ::hudb::huddle uri /a/b/c;
+} -result {HUDDLE {uri /a/b/c}}
+
+test huddle-uri-create.1.2 "test of creating huddle::uri (rel path)" -body {
+    ::hudb::huddle uri a/b/c;
+} -result {HUDDLE {uri a/b/c}}
+
+test huddle-uri-create.1.3 "test of creating huddle::uri (rel path)" -body {
+    ::hudb::huddle uri a/.//b/../c/;
+} -result {HUDDLE {uri a/.//b/../c/}}
+
+# equal
+# -----
+test huddle-uri-equal.1 "test of comparing huddle::uri (same obj)" -body {
+    set a [::hudb::huddle uri /a/b/c];
+    ::hudb::huddle::equal $a $a;
+} -result {1}
+
+test huddle-uri-equal.2 "test of comparing huddle::uri (exact same path)" -body {
+    set a [::hudb::huddle uri /a/b/c];
+    set b [::hudb::huddle uri /a/b/c];
+    ::hudb::huddle::equal $a $b;
+} -result {1}
+
+test huddle-uri-equal.3 "test of comparing huddle::uri (different path)" -body {
+    set a [::hudb::huddle uri /a/b/c];
+    set b [::hudb::huddle uri /x/y/z];
+    ::hudb::huddle::equal $a $b;
+} -result {0}
+
+test huddle-uri-equal.4.1 "test of comparing huddle::uri (same rel path)" -body {
+    set a [::hudb::huddle uri a/b/c];
+    set b [::hudb::huddle uri a/b/c];
+    ::hudb::huddle::equal $a $b;
+} -result {1}
+
+test huddle-uri-equal.4.2 "test of comparing huddle::uri (same rel path)" -body {
+    set a [::hudb::huddle uri a/b/c];
+    set b [::hudb::huddle uri ./a/b/c];
+    ::hudb::huddle::equal $a $b;
+} -result {1}
+
+test huddle-uri-equal.4.3 "test of comparing huddle::uri (same rel path)" -body {
+    set a [::hudb::huddle uri [file join [pwd] a b c]];
+    set b [::hudb::huddle uri a/b/c];
+    ::hudb::huddle::equal $a $b;
+} -result {1}
+
+test huddle-uri-equal.5.1 "test of comparing huddle::uri (same rel and abs path)" -body {
+    set a [::hudb::huddle uri [file normalize a/b/c]];
+    set b [::hudb::huddle uri a/b/c];
+    ::hudb::huddle::equal $a $b;
+} -result {1}
+
+# jsondump
+# --------
+test huddle-uri-jsondump.1.1 "test of jsondump huddle::uri (abs path)" -body {
+    set h [::hudb::huddle uri /a/b/c];
+    ::hudb::huddle::jsondump $h "" "";
+} -result {"/a/b/c"}
+
+test huddle-uri-jsondump.1.2 "test of jsondump huddle::uri (abs path)" -body {
+    set h [::hudb::huddle uri a/b//../c/.];
+    ::hudb::huddle::jsondump $h "" "";
+} -result {"a/b//../c/."}
+
+test huddle-uri-jsondump.2.1 "test of jsondump huddle::uri (rel path)" -body {
+    set h [::hudb::huddle uri a/b/c];
+    ::hudb::huddle::jsondump $h "" "";
+} -result {"a/b/c"}
+
+test huddle-uri-jsondump.2.2 "test of jsondump huddle::uri (rel path)" -body {
+    set h [::hudb::huddle uri ../a/b/c/..];
+    ::hudb::huddle::jsondump $h "" "";
+} -result {"../a/b/c/.."}
 
 
 #------------------------------------------------

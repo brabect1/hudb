@@ -101,6 +101,9 @@ namespace eval hudb {
 
     # infuse new Huddle types into the `huddle` namespace
     namespace eval huddle {
+
+        #TODO Presently the implementation is not really a URI but a file path.
+        #     Proper (file) URI processing will be added later.
         namespace eval uri {
             variable settings;
 
@@ -111,26 +114,20 @@ namespace eval hudb {
             };
 
             proc uri {src} {
-                return [::huddle::wrap [list uri $src]];
+                return [[namespace parent]::wrap [list uri $src]];
             }
 
             proc equal {p1 p2} {
-                #TODO shall compare canonical forms (to cope with relative
-                #     path aspects
+                set p1 [file normalize $p1];
+                set p2 [file normalize $p2];
                 return [expr {$p1 eq $p2}];
             }
 
-            proc jsondump {data {offset "  "} {newline "\n"} {begin ""}} {
-                # JSON permits only oneline string
+            proc jsondump {huddle_obj {offset "  "} {newline "\n"} {begin ""}} {
+                set data [[namespace parent] get_stripped ${huddle_obj}];
                 set data [string map {
-                        \n \\n
-                        \t \\t
-                        \r \\r
-                        \b \\b
-                        \f \\f
                         \\ \\\\
                         \" \\\"
-                        / \\/
                     } $data
                 ];
                 return "\"$data\""
@@ -150,7 +147,7 @@ namespace eval hudb {
                 lassign $node tag value;
                 set sep ${::hudb::separator};
                 if {$tag eq [dict get ${settings} "tag"] && [file pathtype $value] eq "relative"} {
-                    lset node 1 [::hudb::filepath::rebase [lindex $args 0] $value [lindex $args 1]];
+                    lset node 1 [[namespace parent [namespace parent]]::filepath::rebase [lindex $args 0] $value [lindex $args 1]];
                     return {stop 0 ascend 0 repack 1};
                 }
                 return {stop 0 ascend 0 repack 0};
@@ -832,10 +829,22 @@ namespace eval hudb {
             upvar ${_opts(db)} db;
         }
 
+        # get output file path
+        set path [lindex $args $i]; # yields an empty path if $i beyond $args range
+
+        # determine the tagret dir for relative path rebasing
+        # (empty value means use the $path parent folder)
+        set tgt_dir {};
+        if {${path} eq {}} {
+            # empty path means "stdout" and hence avoid any rebasing
+            set tgt_dir {.};
+        }
+
+        # write out (delegate a proper routine)
         if {${_opts(format)} eq "huddle"} {
-            [namespace current]::_to_huddle_file "db" ${_opts(quiet)} [lindex $args $i];
+            [namespace current]::_to_huddle_file "db" ${_opts(quiet)} $path {.} ${tgt_dir};
         } elseif {${_opts(format)} eq "json"} {
-            [namespace current]::_to_json_file "db" ${_opts(quiet)} [lindex $args $i];
+            [namespace current]::_to_json_file   "db" ${_opts(quiet)} $path {.} ${tgt_dir};
         } else {
             error "Unsupported file format '${_opts(format)}'!";
         }
