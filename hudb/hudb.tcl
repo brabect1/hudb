@@ -842,10 +842,13 @@ namespace eval hudb {
     }
 
 
-    proc _to_huddle_file {db_name quiet path} {
+    # Note: To avoid rebasing relative path URIs in the output DB file use
+    # the same values for `src_base_dir` and `tgt_base_dir`.
+    #
+    proc _to_huddle_file {db_name quiet path {src_base_dir .} {tgt_base_dir {}}} {
         upvar ${db_name} db;
 
-        # load data from files
+        # set the output channel
         set fl stdout;
         if {${path} ne {}} {
             if {[catch {set fl [open ${path} w]} err]} {
@@ -854,7 +857,24 @@ namespace eval hudb {
             }
         }
 
-        puts -nonewline ${fl} ${db};
+        # normalize the base dir paths
+        set src_base_dir [file normalize ${src_base_dir}];
+        if {${tgt_base_dir} ne {}} {
+            set tgt_base_dir [file normalize ${tgt_base_dir}];
+        } else {
+            set tgt_base_dir [file normalize [file dirname $path]];
+        }
+
+        # write out DB (incl. rebasing relative file path URIs if needed)
+        if {${src_base_dir} eq ${tgt_base_dir}} {
+            # no rebasing needed
+            puts -nonewline ${fl} ${db};
+        } else {
+            # rebase on a DB copy (so as not alter the original DB)
+            set newdb ${db};
+            _rebase_uris "newdb" ${tgt_base_dir} ${src_base_dir};
+            puts -nonewline ${fl} ${newdb};
+        }
 
         if {${path} ne {}} {
             if {[catch {close $fl} err]} {
@@ -864,10 +884,10 @@ namespace eval hudb {
     }
 
 
-    proc _to_json_file {db_name quiet path} {
+    proc _to_json_file {db_name quiet path {src_base_dir .} {tgt_base_dir {}}} {
         upvar ${db_name} db;
 
-        # load data from files
+        # set the output channel
         set fl stdout;
         if {${path} ne {}} {
             if {[catch {set fl [open ${path} w]} err]} {
@@ -876,7 +896,24 @@ namespace eval hudb {
             }
         }
 
-        puts -nonewline ${fl} [huddle::jsondump ${db} "" ""];
+        # normalize the base dir paths
+        set src_base_dir [file normalize ${src_base_dir}];
+        if {${tgt_base_dir} ne {}} {
+            set tgt_base_dir [file normalize ${tgt_base_dir}];
+        } else {
+            set tgt_base_dir [file normalize [file dirname $path]];
+        }
+
+        # write out DB (incl. rebasing relative file path URIs if needed)
+        if {${src_base_dir} eq ${tgt_base_dir}} {
+            # no rebasing needed
+            puts -nonewline ${fl} [huddle::jsondump ${db} "" ""];
+        } else {
+            # rebase on a DB copy (so as not alter the original DB)
+            set newdb ${db};
+            _rebase_uris "newdb" ${tgt_base_dir} ${src_base_dir};
+            puts -nonewline ${fl} [huddle::jsondump ${newdb} "" ""];
+        }
 
         if {${path} ne {}} {
             if {[catch {close $fl} err]} {
@@ -946,9 +983,15 @@ namespace eval hudb {
         }
     }
 
-    proc _from_huddle_files {db_name quiet paths} {
+    proc _from_huddle_files {db_name quiet paths {tgt_base_dir .} {src_base_dir {}}} {
+        if {[llength $paths] == 0} { return; }
+
         upvar ${db_name} db;
         namespace upvar [namespace current] separator sep;
+
+        # normalize the target dir base for rebasing relative file paths
+        # in DBs read from $paths
+        set tgt_dir [file normalize ${tgt_base_dir}];
 
         # load data from files
         foreach path ${paths} {
@@ -970,6 +1013,16 @@ namespace eval hudb {
 
             if {[catch {close $fl} err]} {
                 if {${quiet} == 0} { error ${err}; }
+            }
+
+            # rebase relative file path URIs to the current working directory
+            if {$src_base_dir ne {}} {
+                set src_dir [file normalize ${src_base_dir}];
+            } else {
+                set src_dir [file normalize [file dirname $path]];
+            }
+            if {${src_dir} ne ${tgt_dir}} {
+                _rebase_uris newdb ${tgt_dir} ${src_dir};
             }
 
             # see if the loaded DB is a dictionary

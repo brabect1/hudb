@@ -1191,6 +1191,32 @@ test hudb-from_files.3.1 "test reading a multiple files in huddle format" -setup
     unset -nocomplain path paths;
 } -result {HUDDLE {D {a {D {b {D {d {s C}}} c {s B} d {s C}}} b {D {x {num 3}}} A {D {d {s A}}} B {D {d {s B}}} C {D {d {s C}}}}}}
 
+# reading a single file with path rebase (default DB)
+test hudb-from_files.4.1 "test rebasing on reading a single file in huddle format" -setup {
+    set path [file join [file dirname [file normalize [info script]]] hudb-from_files-4.1];
+    file mkdir ${path};
+
+    # change to a new PWD
+    set cwd_bak [file normalize [pwd]];
+    cd [file dirname ${path}];
+
+    set fl [open [file join $path input_db] w];
+    puts -nonewline $fl {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri a/b/c} c {uri ../a/b/c}}}}}};
+    close $fl;
+
+    ::hudb::reset;
+} -body {
+    ::hudb::from_files -huddle [file join $path input_db];
+    return ${::hudb::db};
+} -cleanup {
+    ::hudb::reset;
+    # change back to original PWD
+    cd ${cwd_bak};
+    file delete [file join $path input_db];
+    file delete $path;
+    unset fl path cwd_bak;
+} -result  {HUDDLE {D {paths {D {a {uri /a/b/c} b {uri hudb-from_files-4.1/a/b/c} c {uri a/b/c}}}}}};
+
 
 #------------------------------------------------
 # end of unit tests
