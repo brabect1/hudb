@@ -1021,30 +1021,3 @@ namespace eval hudb {
 
 }
 
-## ##puts "isHuddle=[huddle isHuddle $::hudb::db]"
-## puts "empty=[hudb::is_empty]"
-## puts "db=$::hudb::db"
-## #@ parray ::huddle::types
-## hudb::set_key -type number x/y 1.0
-## hudb::set_key a xyz
-## set l {x y}
-## ##puts [eval huddle get_stripped \$::hudb::db [subst $l]]
-## puts [::hudb::get_key x/y]
-## puts [::hudb::get_key -raw x/y]
-## puts [::hudb::get_key -type x/y]
-## hudb::set_key -type string x/y 1.5
-## puts "db=$::hudb::db"
-## puts "exists=[::hudb::exists_key x/y a x]"
-## puts "exists=[::hudb::exists_key -list x/y a x]"
-## puts "exists=[::hudb::exists_key x/y b x]"
-## puts "exists=[::hudb::exists_key -list x/y b x y]"
-## puts "is_empty=[::hudb::is_empty_key x]"
-## puts "is_empty=[::hudb::is_empty_key a]"
-## hudb::set_key a ""
-## puts "is_empty=[::hudb::is_empty_key a]"
-## ::hudb::delete_key x/y a
-## puts "db=$::hudb::db"
-## puts "is_empty=[::hudb::is_empty_key x]"
-## hudb::set_key -type boolean x tadaaa
-## puts "db=$::hudb::db"
-
