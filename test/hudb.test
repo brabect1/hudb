@@ -309,21 +309,56 @@ test hudb-set_key.9 "test set (unknown type, multi level)" -setup {
     ::hudb::reset;
 } -body {
     ::hudb::set_key -type foobar a/b/c xyz;
-} -returnCodes {error} -result {Unknown type 'foobar'!}
+} -returnCodes {error} -result {Invalid type: 'foobar'}
 
 
-test hudb-set_key.10.1 "test set (container type, multi level)" -setup {
+test hudb-set_key.10.1.1 "test set (container type, multi level)" -setup {
     ::hudb::reset;
 } -body {
     ::hudb::set_key -type list a/b/c {1 2};
-} -returnCodes {error} -result {Container types not supported. Use -json option.}
+} -result {HUDDLE {D {a {D {b {D {c {L {{s 1} {s 2}}}}}}}}}}
 
 
-test hudb-set_key.10.2 "test set (container type, multi level)" -setup {
+test hudb-set_key.10.1.2 "test set (container type, multi level)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -type {list number} a/b/c {1 2};
+} -result {HUDDLE {D {a {D {b {D {c {L {{num 1} {num 2}}}}}}}}}}
+
+
+test hudb-set_key.10.2.1 "test set (container type, multi level)" -setup {
     ::hudb::reset;
 } -body {
     ::hudb::set_key -type dict a/b/c {1 2};
-} -returnCodes {error} -result {Container types not supported. Use -json option.}
+} -result {HUDDLE {D {a {D {b {D {c {D {1 {s 2}}}}}}}}}}
+
+
+test hudb-set_key.10.2.2 "test set (container type, multi level)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -type {dict * number} a/b/c {1 2};
+} -result {HUDDLE {D {a {D {b {D {c {D {1 {num 2}}}}}}}}}}
+
+
+test hudb-set_key.10.3.1 "test set (complex container type, multi level)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -type {dict * list} a/b/c {1 2 3 4};
+} -result {HUDDLE {D {a {D {b {D {c {D {1 {L {{s 2}}} 3 {L {{s 4}}}}}}}}}}}}
+
+
+test hudb-set_key.10.3.2 "test set (complex container type, multi level)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -type {dict * {list number}} a/b/c {1 2 3 4};
+} -result {HUDDLE {D {a {D {b {D {c {D {1 {L {{num 2}}} 3 {L {{num 4}}}}}}}}}}}}
+
+
+test hudb-set_key.10.3.3 "test set (complex container type, multi level)" -setup {
+    ::hudb::reset;
+} -body {
+    ::hudb::set_key -type {dict * list} a/b/c {1 {2 3 4}};
+} -result {HUDDLE {D {a {D {b {D {c {D {1 {L {{s 2} {s 3} {s 4}}}}}}}}}}}}
 
 
 test hudb-set_key.11.1 "test set (wrong options: too few)" -setup {

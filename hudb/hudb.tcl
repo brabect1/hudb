@@ -117,6 +117,10 @@ namespace eval hudb {
                 return [[namespace parent]::wrap [list uri $src]];
             }
 
+            proc create {data} {
+                return [uri ${data}];
+            }
+
             proc equal {p1 p2} {
                 set p1 [file normalize $p1];
                 set p2 [file normalize $p2];
@@ -450,8 +454,7 @@ namespace eval hudb {
         }
 
         if {[llength $args] < 2} { error "Wrong number of arguments"; }
-        set tag s;
-        array set _opts { type {} json 0 raw 0}
+        array set _opts { type {string} json 0 raw 0}
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
@@ -461,16 +464,6 @@ namespace eval hudb {
                     set type [lindex $args $i];
                     if {${type} eq "--"} {
                         error "Missing type for the -type option!";
-                    } elseif {![info exists huddle::types(tagOfType:${type})]} {
-                        error "Unknown type '${type}'!";
-                    } else {
-                        set tag $huddle::types(tagOfType:${type});
-                    }
-                    if {![info exists huddle::types(isContainer:${tag})]} {
-                        error "Cannot support '${type}'!";
-                    } elseif {$huddle::types(isContainer:${tag}) ne "no"} {
-                        #TODO Not sure if this will end up `-json` or `-type json`.
-                        error "Container types not supported. Use -json option."
                     }
                     set _opts(type) ${type};
                     set _opts(raw) 0; # override raw value
@@ -494,11 +487,11 @@ namespace eval hudb {
             error "Too many arguments! Args: ${args}";
         }
 
-        _set_key db [lindex $args end-1] [lindex $args end] ${tag} ${_opts(raw)};
+        _set_key db [lindex $args end-1] [lindex $args end] ${_opts(type)} ${_opts(raw)};
     }
 
 
-    proc _set_key {db_name key value tag {raw 0}} {
+    proc _set_key {db_name key value type {raw 0}} {
         upvar ${db_name} db;
         if {![_is_wellformed "db"]} {
             error "Malformed DB!";
@@ -554,7 +547,11 @@ namespace eval hudb {
             set root_node [huddle unwrap ${new_dict}];
 #@            puts "root_node=${root_node}"
             if {${raw} == 0} {
-                set subnode [huddle::argument_to_node ${value} ${tag}];
+                if {[catch { set h [huddle::compile ${type} ${value}] } result options]} {
+                    set subnode null;
+                    return -options ${options} ${result};
+                }
+                set subnode [huddle::unwrap $h];
             } else {
                 set subnode ${value}
             }
@@ -565,7 +562,11 @@ namespace eval hudb {
             set subnode ${root_node};
         } else {
             if {${raw} == 0} {
-                set subnode [huddle::argument_to_node ${value} ${tag}];
+                if {[catch { set h [huddle::compile ${type} ${value}] } result options]} {
+                    set subnode null;
+                    return -options ${options} ${result};
+                }
+                set subnode [huddle::unwrap $h];
             } else {
                 set subnode ${value};
             }
