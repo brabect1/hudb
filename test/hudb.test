@@ -1097,7 +1097,10 @@ test hudb-to_file.2.2 "test writing file in huddle format (file)" -setup {
     set path [file join [file dirname [info script]] hudb-to_file.2.2];
 } -body {
     ::hudb::to_file -huddle ${path};
-    puts -nonewline stdout [read [open ${path}]];
+    set fh [open ${path}];
+    set data [read $fh];
+    close $fh;
+    puts -nonewline stdout $data;
 } -cleanup {
     ::hudb::reset;
     file delete ${path};
@@ -1136,7 +1139,10 @@ test hudb-to_file.2.4 "test writing file in huddle format and rebasing URIs (fil
     cd [file dirname ${path}];
 } -body {
     ::hudb::to_file -huddle [file join ${path} output_db];
-    puts -nonewline stdout [read [open [file join ${path} output_db]]];
+    set fh [open [file join ${path} output_db]];
+    set data [read $fh];
+    close $fh;
+    puts -nonewline stdout $data;
 } -cleanup {
     ::hudb::reset;
     # change back to original PWD
@@ -1167,7 +1173,10 @@ test hudb-to_file.3.2 "test writing file in json format (file)" -setup {
     set path [file join [file dirname [info script]] hudb-to_file.3.2];
 } -body {
     ::hudb::to_file -json ${path};
-    puts -nonewline stdout [read [open ${path}]];
+    set fh [open ${path}];
+    set data [read $fh];
+    close $fh;
+    puts -nonewline stdout $data;
 } -cleanup {
     ::hudb::reset;
     file delete ${path};
@@ -1206,7 +1215,10 @@ test hudb-to_file.3.4 "test writing file in JSON format and rebasing URIs (file)
     cd [file dirname ${path}];
 } -body {
     ::hudb::to_file -json [file join ${path} output_db];
-    puts -nonewline stdout [read [open [file join ${path} output_db]]];
+    set fh [open [file join ${path} output_db]];
+    set data [read $fh];
+    close $fh;
+    puts -nonewline stdout $data;
 } -cleanup {
     ::hudb::reset;
     # change back to original PWD
