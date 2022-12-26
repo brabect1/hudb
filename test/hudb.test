@@ -127,6 +127,36 @@ test hudb-reset.2 "test of reset non-empty DB" -setup {
 } -result {HUDDLE {D {}}}
 
 
+test hudb-reset.3.1 "test of a named, non-empty DB" -setup {
+    set ::hudb::db {HUDDLE {D {a {s xyz}}}}; # make sure internal DB is non-empty
+    set mydb {HUDDLE {D {a {s xyz}}}};
+} -body {
+    ::hudb::reset -db "mydb";
+    if {${::hudb::db} ne {HUDDLE {D {a {s xyz}}}}} {
+        error "Unexpected value: ::hudb::db=${::hudb::db}";
+    }
+    return ${mydb};
+} -cleanup {
+    ::hudb::reset;
+    unset mydb;
+} -result {HUDDLE {D {}}}
+
+
+test hudb-reset.3.2 "test of a named, non-empty DB (using internal DB name)" -setup {
+    set ::hudb::db {HUDDLE {D {a {s xyz}}}}; # make sure internal DB is non-empty
+    set mydb {HUDDLE {D {a {s xyz}}}};
+} -body {
+    ::hudb::reset -db "::hudb::db";
+    if {${mydb} ne {HUDDLE {D {a {s xyz}}}}} {
+        error "Unexpected value: mydb=${mydb}";
+    }
+    return ${::hudb::db};
+} -cleanup {
+    ::hudb::reset;
+    unset mydb;
+} -result {HUDDLE {D {}}}
+
+
 #------------------------------------------------
 # hudb::is_empty
 #------------------------------------------------
@@ -156,6 +186,44 @@ test hudb-is_empty.3 "test of post reset a non-empty DB" -setup {
     ::hudb::reset;
     ::hudb::is_empty;
 } -result {1}
+
+
+test hudb-is_empty.4.1 "test of a named, empty DB" -setup {
+    set ::hudb::db {HUDDLE {D {a {s xyz}}}}; # make sure internal DB is non-empty
+    set mydb {HUDDLE {D {}}};
+} -body {
+    ::hudb::is_empty -db "mydb";
+} -cleanup {
+    ::hudb::reset;
+    unset mydb;
+} -result {1}
+
+
+test hudb-is_empty.4.2 "test of a named, non-empty DB" -setup {
+    ::hudb::reset; # make sure internal DB is empty
+    set mydb {HUDDLE {D {a {s xyz}}}};
+} -body {
+    ::hudb::is_empty -db "mydb";
+} -cleanup {
+    ::hudb::reset;
+    unset mydb;
+} -result {0}
+
+
+test hudb-is_empty.4.3 "test of a named, empty DB (using internal DB name)" -setup {
+    ::hudb::reset; # make sure internal DB is empty
+} -body {
+    ::hudb::is_empty -db "::hudb::db";
+} -result {1}
+
+
+test hudb-is_empty.4.4 "test of a named, non-empty DB (using internal DB name)" -setup {
+    set ::hudb::db {HUDDLE {D {a {s xyz}}}}; # make sure internal DB is non-empty
+} -body {
+    ::hudb::is_empty -db "::hudb::db";
+} -cleanup {
+    ::hudb::reset;
+} -result {0}
 
 
 #------------------------------------------------
@@ -907,6 +975,40 @@ test hudb-get_key.3.7 "test of raw representation of an existing key, dict value
 } -result {HUDDLE {D {c {s xyz}}}}
 
 
+test hudb-get_key.4.1 "test of a named DB (local DB)" -setup {
+    ::hudb::reset;
+    set mydb {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $mydb]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::get_key -db mydb c;
+} -cleanup {
+    unset mydb;
+} -result {false}
+
+
+test hudb-get_key.4.2 "test of a named DB (internal DB)" -setup {
+    set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::get_key -db ::hudb::db b/c;
+} -result {123}
+
+
+# Using an empty key `{}` yields the full DB value.
+test hudb-get_key.5 "test of an empty key" -setup {
+    set ::hudb::db {HUDDLE {D {a {D {b {D {c {s xyz}}}}} b {D {c {num 123}}} c {b false}}}};
+    if {![::hudb::huddle::isHuddle $::hudb::db]} {
+        error "Malformed DB!";
+    }
+} -body {
+    ::hudb::get_key {};
+} -result {a {b {c xyz}} b {c 123} c false}
+
+
 #------------------------------------------------
 # hudb::is_wellformed
 #------------------------------------------------
@@ -924,7 +1026,67 @@ test hudb-is_wellformed.2 "test of a non-empty DB" -setup {
     }
 } -body {
     ::hudb::is_wellformed;
+} -cleanup {
+    ::hudb::reset;
 } -result {1}
+
+
+test hudb-is_wellformed.3.1 "test of a bad-formed DB (non-dict value)" -setup {
+    set ::hudb::db {HUDDLE {s {foo bar}}};
+} -body {
+    ::hudb::is_wellformed;
+} -cleanup {
+    ::hudb::reset;
+} -result {0}
+
+
+test hudb-is_wellformed.3.2 "test of a bad-formed DB (empty value)" -setup {
+    set ::hudb::db {};
+} -body {
+    ::hudb::is_wellformed;
+} -cleanup {
+    ::hudb::reset;
+} -result {0}
+
+
+test hudb-is_wellformed.4.1 "test of a named, empty DB" -setup {
+    set ::hudb::db {HUDDLE {D {a {s xyz}}}}; # make sure internal DB is well-formed
+    set mydb {};
+} -body {
+    ::hudb::is_wellformed -db "mydb";
+} -cleanup {
+    ::hudb::reset;
+    unset mydb;
+} -result {0}
+
+
+test hudb-is_wellformed.4.2 "test of a named, non-empty DB" -setup {
+    set ::hudb::db {}; # make sure internal DB ill-formed
+    set mydb {HUDDLE {D {a {s xyz}}}};
+} -body {
+    ::hudb::is_wellformed -db "mydb";
+} -cleanup {
+    ::hudb::reset;
+    unset mydb;
+} -result {1}
+
+
+test hudb-is_wellformed.4.3 "test of a named, empty DB (using internal DB name)" -setup {
+    set ::hudb::db {HUDDLE {D {a {s xyz}}}}; # make sure internal DB is well-formed
+} -body {
+    ::hudb::is_wellformed -db "::hudb::db";
+} -cleanup {
+    ::hudb::reset;
+} -result {1}
+
+
+test hudb-is_wellformed.4.4 "test of a named, non-empty DB (using internal DB name)" -setup {
+    set ::hudb::db {}; # make sure internal DB ill-formed
+} -body {
+    ::hudb::is_wellformed -db "::hudb::db";
+} -cleanup {
+    ::hudb::reset;
+} -result {0}
 
 
 #------------------------------------------------

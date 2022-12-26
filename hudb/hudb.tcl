@@ -310,7 +310,7 @@ namespace eval hudb {
                     if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
                     incr i 1;
                     set db_name [lindex $args $i];
-                    if {[string match "-*" ${name}]} {
+                    if {[string match "-*" ${db_name}]} {
                         error "Missing type for the -db option!";
                         set db_name {};
                     }
@@ -350,7 +350,7 @@ namespace eval hudb {
                     if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
                     incr i 1;
                     set db_name [lindex $args $i];
-                    if {[string match "-*" ${name}]} {
+                    if {[string match "-*" ${db_name}]} {
                         error "Missing type for the -db option!";
                         set db_name {};
                     }
@@ -393,7 +393,7 @@ namespace eval hudb {
                     if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
                     incr i 1;
                     set db_name [lindex $args $i];
-                    if {[string match "-*" ${name}]} {
+                    if {[string match "-*" ${db_name}]} {
                         error "Missing type for the -db option!";
                         set db_name {};
                     }
@@ -447,17 +447,21 @@ namespace eval hudb {
     #
     proc set_key {args} {
         if {[llength ${args}] == 0} { return; }
-        namespace upvar [namespace current] db db;
-        namespace upvar [namespace current] separator sep;
-        if {![_is_wellformed "db"]} {
-            error "Malformed DB!";
-        }
 
         if {[llength $args] < 2} { error "Wrong number of arguments"; }
-        array set _opts { type {string} json 0 raw 0}
+        array set _opts { type {string} json 0 raw 0 db_name {} };
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set _opts(db_name) [lindex $args $i];
+                    if {[string match "-*" ${_opts(db_name)}]} {
+                        error "Missing type for the -db option!";
+                        set _opts(db_name) {};
+                    }
+                }
                 -type {
                     if {[llength $args] < $i+4} { error "Wrong number of arguments"; }
                     incr i 1;
@@ -487,6 +491,13 @@ namespace eval hudb {
             error "Too many arguments! Args: ${args}";
         }
 
+        # get DB object
+        if {${_opts(db_name)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db_name)} db;
+        }
+
         _set_key db [lindex $args end-1] [lindex $args end] ${_opts(type)} ${_opts(raw)};
     }
 
@@ -498,7 +509,7 @@ namespace eval hudb {
         }
 
         namespace upvar [namespace current] separator sep;
-        set path [split ${key} ${sep}]
+        set path [split ${key} ${sep}];
 
         # remove leading empty key part (and do nothing if
         # no non-empty key part remains)
@@ -591,10 +602,19 @@ namespace eval hudb {
             error "Malformed DB!";
         }
 
-        array set _opts { raw 0 type 0 quiet 0}
+        array set _opts { raw 0 type 0 quiet 0 db_name {} };
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set _opts(db_name) [lindex $args $i];
+                    if {[string match "-*" ${_opts(db_name)}]} {
+                        error "Missing type for the -db option!";
+                        set _opts(db_name) {};
+                    }
+                }
                 -quiet {
                     set _opts(quiet) 1;
                 }
@@ -627,11 +647,31 @@ namespace eval hudb {
         } elseif {$i+1 > [llength $args]} {
             error "Too many arguments! Args: ${args}";
         }
-        set path [split [lindex $args end] ${sep}]
-#@        puts "path:[llength $path]=$path";
-        if {${_opts(raw)}} {
+
+        # get DB object
+        if {${_opts(db_name)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db_name)} db;
+        }
+
+        return [_get_key db [lindex $args end] ${_opts(type)} ${_opts(raw)} ${_opts(quiet)}];
+    }
+
+
+    #TODO `quiet` option is presently unused.
+    proc _get_key {db_name key {type 0} {raw 0} {quiet 0}} {
+        upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
+            error "Malformed DB!";
+        }
+
+        namespace upvar [namespace current] separator sep;
+        set path [split ${key} ${sep}];
+
+        if {${raw}} {
             return [eval huddle get \$db [subst $path]];
-        } elseif {${_opts(type)}} {
+        } elseif {${type}} {
             set tag [lindex [huddle unwrap [eval huddle get \$db [subst $path]]] 0];
             return $huddle::types(type:$tag);
         } else {
@@ -641,16 +681,19 @@ namespace eval hudb {
 
 
     proc delete_key {args} {
-        namespace upvar [namespace current] db db;
-        namespace upvar [namespace current] separator sep;
-        if {![_is_wellformed "db"]} {
-            error "Malformed DB!";
-        }
-
-        array set _opts { quiet 0 }
+        array set _opts { quiet 0 db_name {} };
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set _opts(db_name) [lindex $args $i];
+                    if {[string match "-*" ${_opts(db_name)}]} {
+                        error "Missing type for the -db option!";
+                        set _opts(db_name) {};
+                    }
+                }
                 -quiet {
                     set _opts(quiet) 1;
                 }
@@ -665,8 +708,26 @@ namespace eval hudb {
             incr i 1;
         }; #while
 
-        set args [lrange $args $i end];
-        foreach key $args {
+        # get DB object
+        if {${_opts(db_name)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db_name)} db;
+        }
+
+        _delete_key db [lrange $args $i end] ${_opts(quiet)};
+    }
+
+
+    #TODO `quiet` option is presently unused.
+    proc _delete_key {db_name keys {quiet 0}} {
+        upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
+            error "Malformed DB!";
+        }
+
+        namespace upvar [namespace current] separator sep;
+        foreach key ${keys} {
             set path [split ${key} ${sep}]
             #TODO:<bug in huddle::Unset> eval huddle unset db [subst $path];
             set db [eval huddle remove \$db [subst $path]];
@@ -675,16 +736,19 @@ namespace eval hudb {
 
 
     proc exists_key {args} {
-        namespace upvar [namespace current] db db;
-        namespace upvar [namespace current] separator sep;
-        if {![_is_wellformed "db"]} {
-            error "Malformed DB!";
-        }
-
-        array set _opts {quiet 0 list 0 }
+        array set _opts {quiet 0 list 0 db_name {} };
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set _opts(db_name) [lindex $args $i];
+                    if {[string match "-*" ${_opts(db_name)}]} {
+                        error "Missing type for the -db option!";
+                        set _opts(db_name) {};
+                    }
+                }
                 -list {
                     set _opts(list) 1;
                 }
@@ -707,12 +771,31 @@ namespace eval hudb {
             }
         }
 
-        set args [lrange $args $i end];
+        # get DB object
+        if {${_opts(db_name)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db_name)} db;
+        }
+
+        return [_exists_key db [lrange $args $i end] ${_opts(list)} ${_opts(quiet)}];
+    }
+
+
+    #TODO `quiet` option is presently unused.
+    proc _exists_key {db_name keys {list 0} {quiet 0}} {
+        upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
+            error "Malformed DB!";
+        }
+
+        namespace upvar [namespace current] separator sep;
+
         set l {};
-        foreach key $args {
-            set path [split ${key} ${sep}]
+        foreach key ${keys} {
+            set path [split ${key} ${sep}];
             if {![eval huddle exists \$db [subst $path]]} {
-                if {${_opts(list)}} {
+                if {${list}} {
                     lappend l ${key};
                 } else {
                     return 0;
@@ -720,7 +803,7 @@ namespace eval hudb {
             }
         }
 
-        if {${_opts(list)}} {
+        if {${list}} {
             return ${l};
         } else {
             return 1;
@@ -730,16 +813,20 @@ namespace eval hudb {
 
     proc is_empty_key {args} {
         if {[llength $args] < 1} { error "Wrong number of arguments"; }
-        namespace upvar [namespace current] db db;
-        namespace upvar [namespace current] separator sep;
-        if {![_is_wellformed "db"]} {
-            error "Malformed DB!";
-        }
 
-        array set _opts { raw 0 type 0 quiet 0}
+        array set _opts { quiet 0 db_name {} list 0 };
         set i 0;
         while {$i < [llength $args]} {
             switch -glob -- [lindex $args $i] {
+                -db {
+                    if {$i >= [llength $args] -1} { error "Wrong number of arguments"; }
+                    incr i 1;
+                    set _opts(db_name) [lindex $args $i];
+                    if {[string match "-*" ${_opts(db_name)}]} {
+                        error "Missing type for the -db option!";
+                        set _opts(db_name) {};
+                    }
+                }
                 -quiet {
                     set _opts(quiet) 1;
                 }
@@ -762,9 +849,26 @@ namespace eval hudb {
             error "Too many arguments! Args: ${args}";
         }
 
+        # get DB object
+        if {${_opts(db_name)} eq {}} {
+            namespace upvar [namespace current] db db;
+        } else {
+            upvar ${_opts(db_name)} db;
+        }
 
-        set args [lrange $args $i end];
-        foreach key $args {
+        return [_is_empty_key db [lrange $args $i end] ${_opts(list)} ${_opts(quiet)}];
+    }
+
+
+    #TODO: `list` presently unused.
+    proc _is_empty_key {db_name keys {list 0} {quiet 0}} {
+        upvar ${db_name} db;
+        if {![_is_wellformed "db"]} {
+            error "Malformed DB!";
+        }
+
+        namespace upvar [namespace current] separator sep;
+        foreach key ${keys} {
             if {[exists_key ${key}]} {
                 set path [split ${key} ${sep}];
                 set h [eval huddle get \$db [subst $path]];
@@ -778,7 +882,9 @@ namespace eval hudb {
                     if {[llength ${items}] != 0} { return 0; }
                 }
             } else {
-                error "Key '${key}' does not exist!";
+                if {!${quiet}} {
+                    error "Key '${key}' does not exist!";
+                }
             }
         }
         return 1;
