@@ -149,7 +149,7 @@ namespace eval hudb {
                 namespace upvar [namespace current] settings settings;
                 upvar 1 $node_var node;
                 lassign $node tag value;
-                set sep ${::hudb::separator};
+                namespace upvar [namespace current] separator sep;
                 if {$tag eq [dict get ${settings} "tag"] && [file pathtype $value] eq "relative"} {
                     lset node 1 [[namespace parent [namespace parent]]::filepath::rebase [lindex $args 0] $value [lindex $args 1]];
                     return {stop 0 ascend 0 repack 1};
@@ -596,11 +596,6 @@ namespace eval hudb {
 
     proc get_key {args} {
         if {[llength $args] < 1} { error "Wrong number of arguments"; }
-        namespace upvar [namespace current] db db;
-        namespace upvar [namespace current] separator sep;
-        if {![_is_wellformed "db"]} {
-            error "Malformed DB!";
-        }
 
         array set _opts { raw 0 type 0 quiet 0 db_name {} };
         set i 0;
@@ -669,14 +664,25 @@ namespace eval hudb {
         namespace upvar [namespace current] separator sep;
         set path [split ${key} ${sep}];
 
-        if {${raw}} {
-            return [eval huddle get \$db [subst $path]];
-        } elseif {${type}} {
-            set tag [lindex [huddle unwrap [eval huddle get \$db [subst $path]]] 0];
-            return $huddle::types(type:$tag);
-        } else {
-            return [eval huddle get_stripped \$db [subst $path]];
+        set res {};
+        if {[set err_code [catch {
+                if {${raw}} {
+                    set res [eval huddle get \$db [subst $path]];
+                } elseif {${type}} {
+                    set tag [lindex [huddle unwrap [eval huddle get \$db [subst $path]]] 0];
+                    set res $huddle::types(type:$tag);
+                } else {
+                    set res [eval huddle get_stripped \$db [subst $path]];
+                }
+            } err_msg err_opts]]} {
+            set einfo $::errorInfo;
+            set ecode $::errorCode;
+            if {${quiet} == 0} {
+                return -code ${err_code} -errorcode ${ecode} -errorinfo ${einfo} ${err_msg};
+            }
+            return {};
         }
+        return ${res}
     }
 
 
@@ -735,6 +741,31 @@ namespace eval hudb {
     }
 
 
+    # Tests one or more keys for existence in DB and returns true if they
+    # all do.
+    #
+    # Routine prototype is as follows::
+    #
+    #     exists_key [-list] [-quiet] [-db <varname>] <key_list>
+    #
+    # If any of the keys does not exist, return value is `false`. If no key is
+    # provided, a "too few arguments" error is raised (unless using `-quiet`,
+    # in which case `true` is returned).
+    #
+    # Users may use `-list` option, in which case the routine returns a list
+    # of existing keys. In this case, non-existent keys are ignored. Hence
+    # an empty list is returned if none of the keys exists.
+    #
+    # Unless `-db` option is used, the routine tests existince in the default
+    # DB. If the option is used, the provided `<varname>` is `upvar`'ed and
+    # key existence tested there.
+    #
+    # Note on performance aspect: Because of the way how Huddle DB is compiled
+    # and how its data structure is manipulated, the key existence test is
+    # almost as expensive as `get_key`. Hence if an empty key value is a good
+    # proxy for key existence, it may be more efficient trying to get the key
+    # value directly rather then testing key existence and then getting its
+    # value.
     proc exists_key {args} {
         array set _opts {quiet 0 list 0 db_name {} };
         set i 0;
@@ -752,6 +783,9 @@ namespace eval hudb {
                 -list {
                     set _opts(list) 1;
                 }
+                -quiet {
+                    set _opts(quiet) 1;
+                }
                 -- { incr i 1; break; }
                 -* {
                     error "Unknown option [lindex $args $i]";
@@ -765,7 +799,7 @@ namespace eval hudb {
 
         if {$i >= [llength $args]} {
             if {[info exists _opts(quiet)] && ${_opts(quiet)}} {
-                return 0;
+                return 1;
             } else {
                 error "Too few arguments: '${args}'";
             }
